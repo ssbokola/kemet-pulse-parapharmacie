@@ -1,0 +1,16 @@
+# Ce dépôt ne contient QUE l'application publiable. Rien d'autre ne doit y entrer :
+# ni données d'officine, ni scripts Python du cabinet, ni jeton d'accès.
+.vercel
+.env
+.env.*
+*.log
+
+# Filet de sécurité — si l'un de ces fichiers atterrit ici un jour, il ne partira pas.
+truth_*.json
+historique_*.json
+kpi_summary_*.json
+sauvegarde_*.json
+*.xlsx
+*.xls
+*.csv
+*.pdf

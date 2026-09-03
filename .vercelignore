@@ -1,0 +1,7 @@
+# Ne jamais publier : jeton d'accès local créé par « vercel link », et fichiers de service.
+# Même discipline que _deploiement-vercel/ (application conformité BL).
+.env.local
+.env*
+.vercel
+.gitignore
+.vercelignore
