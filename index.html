@@ -33,7 +33,8 @@ Blocs partages avec l'application officine, copies tels quels a la construction 
      noyau-lecture      SHA-1 53f9f91aba6c
      noyau-equivalences SHA-1 e4781ef666cd
      noyau-agregation   SHA-1 0abebc819aa4
-     noyau-sauvegarde   SHA-1 50fa3c47f70b
+     noyau-sauvegarde   SHA-1 db8c682d9c92
+     noyau-cloud        SHA-1 12569e5504be
      guide-collecte     SHA-1 df599532dde1
      lexique-note       SHA-1 fafe3bc584c3
      modules-registre   SHA-1 7bad12a353a3
@@ -566,6 +567,19 @@ a:focus-visible, .kp-link:focus-visible { outline: 2px solid var(--accent); outl
 .kp-verrou__touche:active { transform: translateY(1px); }
 .kp-verrou__touche--action { font-size: var(--fs-small); font-weight: 600; }
 .kp-verrou__erreur { font-size: var(--fs-small); color: var(--st-urgent-ink); min-height: 1.2em; }
+
+/* ---- Synchro cloud (4/09/2026) : code de récupération et indicateur du bandeau ---- */
+.kp-cloud__boite { width: min(480px, 100%); }
+.kp-cloud__code {
+  font-family: var(--font-num, monospace); font-size: 1.35rem; font-weight: 700;
+  letter-spacing: 0.06em; text-align: center; padding: var(--sp-4);
+  background: var(--surface-2); border: 1px dashed var(--border-strong); border-radius: var(--r-2);
+  word-break: break-all; user-select: all;
+}
+.kp-save__cloud {
+  display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-small);
+  color: var(--text-secondary); margin-left: var(--sp-3);
+}
 
 /* ---- Écran de validation des captures d'inventaire (18/08/2026) ---- */
 .kp-ocr__boite {
@@ -3333,6 +3347,127 @@ function validerKpiSummary(s){
   return problemes;
 }
 
+/* ---------- SYNCHRO CLOUD : DÉRIVATION DES CLÉS (zéro connaissance, 4/09/2026) ------------
+   Le code à 5 chiffres (ci-dessus) ne protège que la mémoire de CE navigateur. Dès que des
+   octets quittent l'appareil pour vivre sur un serveur partagé, 100 000 combinaisons ne
+   suffisent plus : une fuite de base de données les casserait hors ligne en quelques heures.
+   Le code de récupération cloud est donc un second secret, plus fort, auto-généré (jamais
+   choisi par l'utilisateur — dicté au téléphone, un mot mal entendu ou mal noté serait une
+   officine perdue), et il dérive DEUX clés distinctes d'un seul secret maître (schéma HKDF,
+   le principe utilisé par Bitwarden/1Password) :
+     - authKey : jamais envoyée telle quelle. Le serveur n'en connaît que l'empreinte
+       SHA-256, calculée UNE fois à l'activation (voir noyau-cloud, activerSynchro).
+     - encKey  : ne QUITTE JAMAIS l'appareil. Chiffre/déchiffre la fiche officine avant tout
+       envoi. Le serveur ne la voit sous aucune forme, même dérivée.
+   Les deux sont deux branches HKDF différentes du MÊME secret maître : connaître l'une ne
+   redonne pas l'autre (propriété d'une fonction pseudo-aléatoire) — une fuite d'authKey
+   (improbable, TLS) ne compromettrait donc jamais les données chiffrées.                    */
+
+const ALPHABET_CODE_RECUPERATION = "23456789ABCDEFGHJKMNPQRSTVWXYZ"; // 0/1/I/L/O/U exclus
+// Plus élevé que PBKDF2_ITER (code local) : c'est désormais la SEULE défense contre une base
+// de données volée, contrairement au code à 5 chiffres qui n'a besoin de résister qu'à un
+// accès opportuniste à l'appareil lui-même.
+const PBKDF2_ITER_CLOUD = 600000;
+
+// 20 caractères, présentés en 5 blocs de 4 — jamais choisi par l'utilisateur.
+function genererCodeRecuperation(){
+  const octets = crypto.getRandomValues(new Uint8Array(20));
+  let brut = "";
+  for(let i=0;i<octets.length;i++){
+    brut += ALPHABET_CODE_RECUPERATION[octets[i] % ALPHABET_CODE_RECUPERATION.length];
+  }
+  const blocs = [];
+  for(let i=0;i<brut.length;i+=4) blocs.push(brut.slice(i,i+4));
+  return blocs.join("-");
+}
+
+function _normaliserCodeRecuperation(code){
+  return String(code||"").replace(/[^0-9A-Za-z]/g,"").toUpperCase();
+}
+
+async function _deriverMasterKeyHkdf(code, authSaltB64, iterations){
+  const base = await crypto.subtle.importKey("raw",
+    new TextEncoder().encode(_normaliserCodeRecuperation(code)), "PBKDF2", false, ["deriveBits"]);
+  const masterBits = await crypto.subtle.deriveBits(
+    {name:"PBKDF2", salt:_debase64(authSaltB64), iterations:iterations||PBKDF2_ITER_CLOUD, hash:"SHA-256"},
+    base, 256);
+  return crypto.subtle.importKey("raw", masterBits, "HKDF", false, ["deriveBits"]);
+}
+
+// Rend {authKeyB64, encKeyBits} : authKeyB64 part au serveur, une seule fois, à
+// l'authentification ; encKeyBits reste local, jamais envoyé. DEUX sels seulement — authSalt
+// et encSalt, exactement les deux colonnes de la table `officines` côté serveur (voir
+// _deploiement-vercel-api/lib/schema.sql) — générés une fois à l'activation puis publics (un
+// sel n'est pas un secret). authSalt sert DEUX fois : comme sel d'étirement PBKDF2, et comme
+// sel de la branche HKDF « auth ». Ce n'est pas un raccourci dangereux : la RFC 5869 (HKDF)
+// prévoit explicitement la dérivation de plusieurs clés depuis un même secret et un même sel,
+// séparées par le seul paramètre `info` — ce que fait la branche « enc » avec son propre sel
+// ET son propre info. (Un troisième sel « maître » distinct a existé un temps dans une
+// version antérieure de ce code ; il ne correspondait à AUCUNE colonne côté serveur et aurait
+// rendu la liaison d'un nouvel appareil impossible — corrigé avant tout déploiement.)
+async function deriverClesCloud(code, authSaltB64, encSaltB64, iterations){
+  const masterKey = await _deriverMasterKeyHkdf(code, authSaltB64, iterations);
+  const info = (texte)=>new TextEncoder().encode(texte);
+  const authKeyBits = await crypto.subtle.deriveBits(
+    {name:"HKDF", hash:"SHA-256", salt:_debase64(authSaltB64), info:info("kemet-pulse-cloud-auth-v1")},
+    masterKey, 256);
+  const encKeyBits = await crypto.subtle.deriveBits(
+    {name:"HKDF", hash:"SHA-256", salt:_debase64(encSaltB64), info:info("kemet-pulse-cloud-enc-v1")},
+    masterKey, 256);
+  return { authKeyB64:_b64(authKeyBits), encKeyBits:encKeyBits };
+}
+
+async function _cleAesDepuisBits(bits){
+  return crypto.subtle.importKey("raw", bits, "AES-GCM", false, ["encrypt","decrypt"]);
+}
+
+// Chiffre/déchiffre la fiche officine avec la clé CLOUD — jamais avec la clé locale, qui elle
+// ne protège que la mémoire de ce navigateur.
+async function chiffrerPourCloud(officine, encKeyBits){
+  const cle = await _cleAesDepuisBits(encKeyBits);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const clair = new TextEncoder().encode(JSON.stringify(officine));
+  const chiffre = await crypto.subtle.encrypt({name:"AES-GCM", iv:iv}, cle, clair);
+  return { ciphertext:_b64(chiffre), iv:_b64(iv) };
+}
+async function dechiffrerDepuisCloud(ciphertextB64, ivB64, encKeyBits){
+  const cle = await _cleAesDepuisBits(encKeyBits);
+  const clair = await crypto.subtle.decrypt({name:"AES-GCM", iv:_debase64(ivB64)}, cle,
+    _debase64(ciphertextB64));
+  return JSON.parse(new TextDecoder().decode(clair));
+}
+
+// Met encKey en cache SOUS la clé locale (verrou.cle, celle du code à 5 chiffres) : un
+// déverrouillage local rouvre AUSSI l'accès cloud, sans jamais redemander le code de
+// récupération. Rend {iv, donnees} à ranger dans l'enregistrement IndexedDB
+// (nouveau champ cloudEncKeyChiffree, voir secoursEcrire).
+async function chiffrerEncKeyLocalement(encKeyBits, verrouLocal){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const chiffre = await crypto.subtle.encrypt({name:"AES-GCM", iv:iv}, verrouLocal.cle, encKeyBits);
+  return { iv:_b64(iv), donnees:_b64(chiffre) };
+}
+// Rend l'ArrayBuffer d'encKey, ou null si absent/illisible — JAMAIS une levée : un cache
+// corrompu ou absent dégrade proprement vers « pas de synchro sur cet appareil ».
+async function dechiffrerEncKeyLocalement(cloudEncKeyChiffree, verrouLocal){
+  if(!cloudEncKeyChiffree || !verrouLocal || !verrouLocal.cle) return null;
+  try{
+    const iv = _debase64(cloudEncKeyChiffree.iv);
+    return await crypto.subtle.decrypt({name:"AES-GCM", iv:iv}, verrouLocal.cle,
+      _debase64(cloudEncKeyChiffree.donnees));
+  }catch(e){ return null; }
+}
+
+// "jamais" | "a-jour" | "en-retard" | "conflit" | "erreur" — lu par le bandeau de sauvegarde.
+// Ne regarde QUE l'officine (état déclaratif) : c'est noyau-cloud qui écrit _synchroCloud.
+function etatSynchro(officine){
+  if(!officine || !officine.config || !officine.config.synchro_cloud_active) return "jamais";
+  const s = officine._synchroCloud || {};
+  if(s.conflit) return "conflit";
+  if(s.erreur) return "erreur";
+  if(s.enAttente) return "en-retard";
+  return "a-jour";
+}
+
 glob.KemetSauvegarde = {
   SCHEMA_VERSION, officineVierge, upsertPeriode, periodesTriees,
   memoriserEquivalence, importerHistoriqueExistant, NOMS_HISTORIQUES_CONNUS,
@@ -3342,7 +3477,180 @@ glob.KemetSauvegarde = {
   secoursEcrire, secoursLire, secoursLister, secoursSupprimer, memoireDisponible,
   chiffrementDisponible, preparerVerrou, ouvrirVerrou,
   validerKpiSummary,
+  genererCodeRecuperation, deriverClesCloud, chiffrerPourCloud, dechiffrerDepuisCloud,
+  chiffrerEncKeyLocalement, dechiffrerEncKeyLocalement, etatSynchro,
 };
+})(window);
+</script>
+<script id="noyau-cloud">
+(function(glob){
+
+// Même origine pour les 3 pôles qui embarquent ce bloc (Achat, Trésorerie, Parapharmacie) :
+// le backend ne distingue pas les pôles, la fiche officine leur est commune par construction.
+const API_BASE = "https://kemet-pulse-api.vercel.app";
+
+async function _appel(chemin, options){
+  let reponse;
+  try{
+    reponse = await fetch(API_BASE + chemin, options);
+  }catch(e){
+    return { ok:false, erreur:"Réseau injoignable : " + (e && e.message || e) };
+  }
+  let corps = null;
+  try{ corps = await reponse.json(); }catch(e){ /* réponse vide (ex. 204) : pas une erreur */ }
+  if(!reponse.ok){
+    return { ok:false, statut:reponse.status, erreur:(corps && corps.erreur) || ("Erreur " + reponse.status), corps:corps };
+  }
+  return { ok:true, statut:reponse.status, corps:corps };
+}
+
+const SV = glob.KemetSauvegarde;
+
+// Active la synchro cloud pour une officine qui n'en a pas encore : génère les trois sels,
+// dérive les clés depuis le code de récupération (déjà généré par l'appelant, voir l'écran
+// d'activation), enregistre le vérificateur côté serveur, met encKey en cache sous le verrou
+// local. Ne pousse PAS encore la fiche — l'appelant fait un premier `pousserVersCloud` juste
+// après s'il le souhaite, pour que les deux étapes restent visibles séparément dans le journal.
+function _selAleatoire(){
+  return btoa(String.fromCharCode.apply(null, crypto.getRandomValues(new Uint8Array(16))));
+}
+function _debase64Bits(s){ return Uint8Array.from(atob(s), c=>c.charCodeAt(0)); }
+
+async function activerSynchro(officine, verrouLocal, codeRecuperation){
+  if(!verrouLocal || !verrouLocal.cle){
+    return { ok:false, erreur:"L'officine doit être protégée par un code local avant d'activer la synchro cloud." };
+  }
+  // Deux sels seulement — voir le commentaire de deriverClesCloud (noyau-sauvegarde) pour
+  // pourquoi un troisième sel « maître » serait redondant ET incompatible avec le schéma
+  // serveur (qui n'a que auth_salt/enc_salt, aucune colonne pour un sel maître séparé).
+  const authSalt = _selAleatoire();
+  const encSalt = _selAleatoire();
+  const iterations = 600000;
+
+  const { authKeyB64, encKeyBits } = await SV.deriverClesCloud(
+    codeRecuperation, authSalt, encSalt, iterations);
+  const verifieur = await crypto.subtle.digest("SHA-256", Uint8Array.from(atob(authKeyB64), c=>c.charCodeAt(0)));
+  const authVerifierB64 = btoa(String.fromCharCode.apply(null, new Uint8Array(verifieur)));
+
+  const r = await _appel("/api/officines/register", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({
+      officine_id: officine.id, auth_salt: authSalt, auth_iterations: iterations,
+      auth_verifier: authVerifierB64, enc_salt: encSalt,
+    }),
+  });
+  if(!r.ok) return r;
+
+  // Les DEUX clés sont rendues brutes ; c'est l'écran appelant (interface) qui les met en
+  // cache local ENSEMBLE sous le code à 5 chiffres — pas ce module, qui ne fait pas de
+  // stockage (voir chargerCleCloudLocale/rendreSynchroCloud dans le bloc `interface`).
+  return {
+    ok:true, handle: r.corps.handle, authSalt, encSalt, iterations,
+    encKeyBits, authKeyBits: _debase64Bits(authKeyB64),
+  };
+}
+
+// Pousse la fiche courante vers le cloud. `encKeyBits` vient du cache local déchiffré au
+// déverrouillage (dechiffrerEncKeyLocalement) — jamais redemandé à l'utilisateur.
+async function pousserVersCloud(officine, sessionToken, handle, encKeyBits, versionAttendue){
+  const { ciphertext, iv } = await SV.chiffrerPourCloud(officine, encKeyBits);
+  const r = await _appel("/api/officines/" + handle + "/blob", {
+    method:"PUT", headers:{"Content-Type":"application/json", "Authorization":"Bearer " + sessionToken},
+    body: JSON.stringify({ ciphertext, iv, expected_version: Number(versionAttendue)||0 }),
+  });
+  if(!r.ok){
+    if(r.statut === 409) return { ok:false, conflit:true, serveur:r.corps };
+    return r;
+  }
+  // BIGINT revient en TEXTE du serveur (Postgres via Neon) : convertir explicitement en
+  // nombre ICI, une fois pour toutes, plutôt que de laisser une chaîne se glisser dans
+  // officine.config._cloud_version et fausser silencieusement la comparaison au prochain
+  // envoi (bug réel, reproduit le 4/09/2026 : une 2ᵉ poussée tombait toujours en conflit).
+  return { ok:true, version:Number(r.corps.version), updatedAt:r.corps.updated_at };
+}
+
+// Tire la fiche depuis le cloud et la déchiffre. Rend la fiche EN PLUS de la version — c'est
+// l'appelant qui décide quoi en faire (jamais un remplacement silencieux de l'officine locale).
+async function tirerDuCloud(sessionToken, handle, encKeyBits){
+  const r = await _appel("/api/officines/" + handle + "/blob", {
+    method:"GET", headers:{"Authorization":"Bearer " + sessionToken},
+  });
+  if(!r.ok) return r;
+  try{
+    const officine = await SV.dechiffrerDepuisCloud(r.corps.ciphertext, r.corps.iv, encKeyBits);
+    return { ok:true, officine, version:Number(r.corps.version), updatedAt:r.corps.updated_at };
+  }catch(e){
+    return { ok:false, erreur:"La fiche cloud ne se déchiffre pas avec cette clé — code de récupération incorrect ou fiche corrompue." };
+  }
+}
+
+// Authentifie une clé déjà dérivée (fraîchement, ou relue du cache local chiffré) auprès du
+// serveur. Fonction PARTAGÉE : relierNouvelAppareil() l'utilise après une dérivation fraîche,
+// et l'écran appelant (interface) l'utilise pour renouveler une session expirée SANS jamais
+// redemander le code de récupération, tant que le cache local reste lisible.
+function _b64Bits(bits){ return btoa(String.fromCharCode.apply(null, new Uint8Array(bits))); }
+async function authentifier(handle, authKeyBits){
+  return _appel("/api/officines/" + handle + "/auth", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ auth_key: _b64Bits(authKeyBits) }),
+  });
+}
+
+// Relie un nouvel appareil : handle + code de récupération -> officine en clair, prête pour
+// SV.adopterOfficine() exactement comme un fichier déposé aujourd'hui. Ne touche à AUCUN
+// stockage local — c'est l'écran appelant qui orchestre la suite (adopter, creerCode, etc.),
+// même découpage que chargerFichiersSauvegarde().
+async function relierNouvelAppareil(handle, codeRecuperation){
+  const rSels = await _appel("/api/officines/" + handle + "/salts", { method:"GET" });
+  if(!rSels.ok) return rSels;
+  const { auth_salt, auth_iterations, enc_salt } = rSels.corps;
+
+  const { authKeyB64, encKeyBits } = await SV.deriverClesCloud(
+    codeRecuperation, auth_salt, enc_salt, auth_iterations);
+  const authKeyBits = _debase64Bits(authKeyB64);
+
+  const rAuth = await authentifier(handle, authKeyBits);
+  if(!rAuth.ok) return rAuth;
+
+  const rBlob = await tirerDuCloud(rAuth.corps.session_token, handle, encKeyBits);
+  if(!rBlob.ok) return rBlob;
+
+  return {
+    ok:true, officine: rBlob.officine, sessionToken: rAuth.corps.session_token,
+    version: rBlob.version, handle, authSalt:auth_salt, encSalt:enc_salt,
+    iterations: auth_iterations, encKeyBits, authKeyBits,
+  };
+}
+
+// Remplace le code de récupération. `encKeyBits`/`officine` viennent d'un appareil DÉJÀ
+// déverrouillé localement (code à 5 chiffres valide) — c'est la voie de récupération choisie
+// par le DG : un code cloud perdu n'est pas définitif tant qu'un appareil reste accessible.
+async function rotationCode(sessionToken, handle, officine, ancienEncKeyBits, nouveauCode){
+  const nouveauAuthSalt = _selAleatoire();
+  const nouveauEncSalt = _selAleatoire();
+  const iterations = 600000;
+
+  const { authKeyB64, encKeyBits:nouvelEncKeyBits } = await SV.deriverClesCloud(
+    nouveauCode, nouveauAuthSalt, nouveauEncSalt, iterations);
+  const verifieur = await crypto.subtle.digest("SHA-256", Uint8Array.from(atob(authKeyB64), c=>c.charCodeAt(0)));
+  const authVerifierB64 = btoa(String.fromCharCode.apply(null, new Uint8Array(verifieur)));
+
+  const { ciphertext, iv } = await SV.chiffrerPourCloud(officine, nouvelEncKeyBits);
+
+  const r = await _appel("/api/officines/" + handle + "/rotate-phrase", {
+    method:"POST", headers:{"Content-Type":"application/json", "Authorization":"Bearer " + sessionToken},
+    body: JSON.stringify({
+      new_auth_salt: nouveauAuthSalt, new_auth_iterations: iterations,
+      new_auth_verifier: authVerifierB64, new_enc_salt: nouveauEncSalt,
+      ciphertext, iv,
+    }),
+  });
+  if(!r.ok) return r;
+  return { ok:true, authSalt:nouveauAuthSalt, encSalt:nouveauEncSalt,
+            iterations, encKeyBits:nouvelEncKeyBits };
+}
+
+glob.KemetCloud = { activerSynchro, pousserVersCloud, tirerDuCloud, relierNouvelAppareil, rotationCode, authentifier, API_BASE };
 })(window);
 </script>
 <script id="guide-collecte">
