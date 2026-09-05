@@ -34,7 +34,7 @@ Blocs partages avec l'application officine, copies tels quels a la construction 
      noyau-equivalences SHA-1 e4781ef666cd
      noyau-agregation   SHA-1 0abebc819aa4
      noyau-sauvegarde   SHA-1 db8c682d9c92
-     noyau-cloud        SHA-1 12569e5504be
+     noyau-cloud        SHA-1 89ac464518d5
      guide-collecte     SHA-1 df599532dde1
      lexique-note       SHA-1 fafe3bc584c3
      modules-registre   SHA-1 7bad12a353a3
@@ -3541,6 +3541,21 @@ async function activerSynchro(officine, verrouLocal, codeRecuperation){
   });
   if(!r.ok) return r;
 
+  // /register est idempotent CÔTÉ SERVEUR : ré-enregistrer un officine_id déjà connu rend son
+  // handle existant SANS toucher au vérificateur (voir le commentaire de register.js). Si
+  // c'est le cas ici, les authSalt/encSalt/clés qu'on vient de générer NE CORRESPONDENT À RIEN
+  // côté serveur — les mettre en cache quand même verrouillerait l'officine pour de bon (plus
+  // aucun futur authentifier() ne matcherait le vérificateur réellement stocké, et la seule
+  // voie de rattrapage, rotate-phrase, exige justement une session qu'on ne pourrait plus
+  // obtenir). Bug réel trouvé le 4/09/2026 en revue de code, avant qu'il ne touche l'officine
+  // réelle : on refuse plutôt que d'écraser en silence.
+  if(r.corps.deja_enregistre){
+    return { ok:false, dejaEnregistre:true, handle:r.corps.handle,
+      erreur:"Cette officine est déjà synchronisée sur le cloud (code court "+r.corps.handle+
+        "). Utiliser « Relier un nouvel appareil » avec le code de récupération existant, "+
+        "plutôt que d'en créer un nouveau — sinon les deux appareils ne pourront plus jamais s'authentifier l'un comme l'autre." };
+  }
+
   // Les DEUX clés sont rendues brutes ; c'est l'écran appelant (interface) qui les met en
   // cache local ENSEMBLE sous le code à 5 chiffres — pas ce module, qui ne fait pas de
   // stockage (voir chargerCleCloudLocale/rendreSynchroCloud dans le bloc `interface`).
@@ -3559,7 +3574,11 @@ async function pousserVersCloud(officine, sessionToken, handle, encKeyBits, vers
     body: JSON.stringify({ ciphertext, iv, expected_version: Number(versionAttendue)||0 }),
   });
   if(!r.ok){
-    if(r.statut === 409) return { ok:false, conflit:true, serveur:r.corps };
+    // `erreur` reste present ICI comme partout ailleurs (contrairement a avant ce correctif) :
+    // un futur appelant qui ne connaitrait pas encore `conflit` et ne lirait que `!r.ok`+`r.erreur`
+    // (le motif etabli partout ailleurs dans ce module) verra quand meme un message utile, pas
+    // un texte vide.
+    if(r.statut === 409) return { ok:false, conflit:true, erreur:"Conflit de version.", serveur:r.corps };
     return r;
   }
   // BIGINT revient en TEXTE du serveur (Postgres via Neon) : convertir explicitement en
@@ -3646,8 +3665,12 @@ async function rotationCode(sessionToken, handle, officine, ancienEncKeyBits, no
     }),
   });
   if(!r.ok) return r;
-  return { ok:true, authSalt:nouveauAuthSalt, encSalt:nouveauEncSalt,
-            iterations, encKeyBits:nouvelEncKeyBits };
+  // BIGINT revient en TEXTE (voir pousserVersCloud) : Number() ICI, une fois pour toutes, pour
+  // que l'appelant puisse ranger r.version dans officine.config._cloud_version sans y penser.
+  // Absent si aucune fiche n'existait encore côté serveur (rien à re-numéroter) — jamais 0 par
+  // défaut ici, un `undefined` reste `undefined`, jamais confondu avec « version zéro connue ».
+  return { ok:true, authSalt:nouveauAuthSalt, encSalt:nouveauEncSalt, iterations,
+            encKeyBits:nouvelEncKeyBits, version: r.corps.version!==undefined ? Number(r.corps.version) : undefined };
 }
 
 glob.KemetCloud = { activerSynchro, pousserVersCloud, tirerDuCloud, relierNouvelAppareil, rotationCode, authentifier, API_BASE };
