@@ -34,7 +34,7 @@ Blocs partages avec l'application officine, copies tels quels a la construction 
      noyau-equivalences SHA-1 e4781ef666cd
      noyau-agregation   SHA-1 0abebc819aa4
      noyau-sauvegarde   SHA-1 db8c682d9c92
-     noyau-cloud        SHA-1 89ac464518d5
+     noyau-cloud        SHA-1 212b4bbac115
      guide-collecte     SHA-1 df599532dde1
      lexique-note       SHA-1 fafe3bc584c3
      modules-registre   SHA-1 7bad12a353a3
@@ -3670,7 +3670,8 @@ async function rotationCode(sessionToken, handle, officine, ancienEncKeyBits, no
   // Absent si aucune fiche n'existait encore côté serveur (rien à re-numéroter) — jamais 0 par
   // défaut ici, un `undefined` reste `undefined`, jamais confondu avec « version zéro connue ».
   return { ok:true, authSalt:nouveauAuthSalt, encSalt:nouveauEncSalt, iterations,
-            encKeyBits:nouvelEncKeyBits, version: r.corps.version!==undefined ? Number(r.corps.version) : undefined };
+            encKeyBits:nouvelEncKeyBits, authKeyBits:_debase64Bits(authKeyB64),
+            version: r.corps.version!==undefined ? Number(r.corps.version) : undefined };
 }
 
 glob.KemetCloud = { activerSynchro, pousserVersCloud, tirerDuCloud, relierNouvelAppareil, rotationCode, authentifier, API_BASE };
