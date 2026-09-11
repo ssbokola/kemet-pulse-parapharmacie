@@ -1840,6 +1840,12 @@ main { max-width: 1240px; margin: 0 auto; padding: var(--sp-6) var(--sp-8) var(-
     <p class="kp-micro kp-muted">Tout est lu dans ce navigateur : aucun fichier n'est téléversé.</p>
   </section>
 
+  <!-- RESUME DU DEPOT (11/09/2026) : directement sous la zone de depot, exactement la ou l'oeil
+       se trouve apres avoir choisi un dossier -- parle TOUJOURS apres un depot, succes ou echec.
+       Meme raison qu'en Tresorerie : le seul signe visible d'un depot non reconnu etait une
+       petite phrase grise a cote du titre, hors du regard. -->
+  <div id="resume-depot"></div>
+
   <section class="bloc">
     <div class="kp-panel">
       <div class="kp-band kp-band--neutre">Journal de traitement</div>
@@ -8055,6 +8061,7 @@ async function traiterDepot(fileList){
     journalVider();
     journalLigne("warn", "Aucun fichier n'a été déposé (dossier vide, ou sélection annulée).");
     document.getElementById("sous-titre-ecran").textContent = "Aucun fichier reçu — réessayer le dépôt.";
+    afficherResumeDepot(0, 0, 0);
     return;
   }
   dernierFichiers = files;
@@ -8079,6 +8086,7 @@ async function traiterDepot(fileList){
   if(!lot.length){
     journalLigne("err","Aucun fichier exploitable dans ce dépôt.");
     document.getElementById("sous-titre-ecran").textContent = "Aucun fichier exploitable dans ce dépôt — voir le journal.";
+    afficherResumeDepot(files.length, 0, 0);
     return;
   }
   journalLigne("info", lot.length+" fichier(s) déposé(s). Les modules du pôle vont y chercher "+
@@ -8154,6 +8162,7 @@ async function traiterDepot(fileList){
     ? ("Analyse produite le "+new Date().toLocaleDateString("fr-FR")+" · "+n+" indicateur(s) "+
        "calculé(s) sur "+modules.length+" installé(s)")
     : "Aucun indicateur n'a pu être calculé — voir le journal.";
+  afficherResumeDepot(lot.length, lot.length, n);
 }
 
 // Alerte periode (11/09/2026, capture DG : depot d'aout sans effet visible pendant que
@@ -8189,6 +8198,45 @@ function afficherAlertePeriode(rejets){
     cont.innerHTML = "";
     if(dernierFichiers) await traiterDepot(dernierFichiers);
   });
+}
+
+// Bandeau de resume, TOUJOURS rempli apres un depot (11/09/2026, capture DG : "Choisir un
+// dossier" -> fenetre Windows -> selection -> "puis rien"). Reproduit en direct : le depot
+// fonctionnait (fichier lu, modules interroges, journal rempli), mais quand rien n'est
+// reconnu, le SEUL signe visible etait une petite phrase grise a cote du titre -- hors du
+// regard juste apres avoir choisi un dossier. Ce bandeau vit directement sous la zone de
+// depot et parle dans TOUS les cas, jamais un ecran qui semble ne pas avoir bouge.
+function afficherResumeDepot(recus, exploitables, calcules){
+  const cont = document.getElementById("resume-depot");
+  if(!cont) return;
+  if(recus === 0){
+    cont.innerHTML =
+      '<div class="kp-panel" style="margin:12px 0">'+
+      '<div class="kp-band kp-band--urgent">Rien n\'a été reçu</div>'+
+      '<div class="kp-panel__body"><p class="kp-body">Le dossier choisi semble vide, ou la '+
+      'sélection a été annulée. Réessayer.</p></div></div>';
+  } else if(exploitables === 0){
+    cont.innerHTML =
+      '<div class="kp-panel" style="margin:12px 0">'+
+      '<div class="kp-band kp-band--urgent">'+recus+' fichier(s) reçu(s), aucun lisible</div>'+
+      '<div class="kp-panel__body"><p class="kp-body">Voir le <b>Journal de traitement</b> '+
+      'ci-dessous : chaque fichier y est nommé avec la raison exacte du refus.</p></div></div>';
+  } else if(calcules === 0){
+    cont.innerHTML =
+      '<div class="kp-panel" style="margin:12px 0">'+
+      '<div class="kp-band kp-band--vigilance">'+exploitables+' fichier(s) déposé(s), aucun reconnu</div>'+
+      '<div class="kp-panel__body"><p class="kp-body">Aucun de ces fichiers n\'a été reconnu '+
+      'comme un export attendu par ce pôle. Voir le <b>Journal de traitement</b> ci-dessous '+
+      'pour la raison exacte de chacun, et l\'onglet <b>Aide</b> pour la liste des pièces '+
+      'attendues et leur écran Médiciel.</p></div></div>';
+  } else {
+    cont.innerHTML =
+      '<div class="kp-panel" style="margin:12px 0">'+
+      '<div class="kp-band kp-band--conforme">'+calcules+' indicateur(s) calculé(s) sur '+
+      exploitables+' fichier(s) déposé(s)</div>'+
+      '<div class="kp-panel__body"><p class="kp-body">Voir l\'onglet <b>Vue d\'ensemble</b>.'+
+      '</p></div></div>';
+  }
 }
 
 const depot = document.getElementById("depot-fichiers");
