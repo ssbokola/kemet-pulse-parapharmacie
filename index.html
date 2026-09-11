@@ -1803,6 +1803,21 @@ main { max-width: 1240px; margin: 0 auto; padding: var(--sp-6) var(--sp-8) var(-
     <span class="kp-small kp-secondary" id="sous-titre-ecran">Aucun fichier déposé.</span>
   </div>
 
+  <!-- ==================== NAVIGATION PAR ONGLETS (11/09/2026, demande DG) ====================
+       Meme composant .kp-tabs/.kp-tab que l'application Achat & Stock -- deja present, inutilise,
+       dans la feuille de style partagee. Quatre onglets ici (pas cinq : ce pole n'a ni objectifs
+       ni note imprimable, donc pas de "Plan d'actions"). Le contenu de chaque bloc n'a pas change
+       une seule ligne : seul le regroupement et l'ordre ont bouge.
+       ======================================================================================= -->
+  <nav id="nav-onglets" class="kp-tabs" role="tablist" aria-label="Sections de l'application">
+    <button class="kp-tab actif" id="tab-analyse"   data-onglet="analyse"   role="tab" aria-selected="true"  aria-controls="analyse"   type="button">Déposer les fichiers</button>
+    <button class="kp-tab"       id="tab-apercu"    data-onglet="apercu"    role="tab" aria-selected="false" aria-controls="apercu"    type="button">Vue d'ensemble</button>
+    <button class="kp-tab"       id="tab-tendances" data-onglet="tendances" role="tab" aria-selected="false" aria-controls="tendances" type="button">Tendances</button>
+    <button class="kp-tab"       id="tab-aide"      data-onglet="aide"      role="tab" aria-selected="false" aria-controls="aide"      type="button">Aide</button>
+  </nav>
+
+  <section class="onglet actif" id="analyse" role="tabpanel" aria-labelledby="tab-analyse" tabindex="0">
+
   <!-- LA LISTE DES PIÈCES, EN PREMIER — même règle que les deux autres applications :
        remplie par rendrePiecesDuMois(), se coche au fil des dépôts. -->
   <section class="bloc" id="pieces-du-mois"></section>
@@ -1825,6 +1840,18 @@ main { max-width: 1240px; margin: 0 auto; padding: var(--sp-6) var(--sp-8) var(-
     <p class="kp-micro kp-muted">Tout est lu dans ce navigateur : aucun fichier n'est téléversé.</p>
   </section>
 
+  <section class="bloc">
+    <div class="kp-panel">
+      <div class="kp-band kp-band--neutre">Journal de traitement</div>
+      <p class="kp-body kp-secondary">Chaque fichier déposé est listé : reconnu, calculé, ignoré ou refusé — jamais de silence.</p>
+      <div id="journal" class="kp-log"></div>
+    </div>
+  </section>
+
+  </section>
+
+  <section class="onglet" id="apercu" role="tabpanel" aria-labelledby="tab-apercu" tabindex="0">
+
   <!-- VUE D'ENSEMBLE : les cartes, une par indicateur publié. -->
   <section class="bloc masque" id="bloc-cartes">
     <div class="kp-band kp-band--neutre">Vue d'ensemble</div>
@@ -1836,18 +1863,6 @@ main { max-width: 1240px; margin: 0 auto; padding: var(--sp-6) var(--sp-8) var(-
     <div class="kp-panel">
       <div class="kp-band kp-band--neutre">Rayons</div>
       <div id="tableau-detail"></div>
-    </div>
-  </section>
-
-  <section class="bloc masque" id="bloc-tendances">
-    <div class="kp-panel">
-      <div class="kp-band kp-band--neutre">Évolution sur les derniers mois</div>
-      <div class="kp-toolbar">
-        <label class="kp-caps" for="sel-indicateur">Indicateur</label>
-        <select id="sel-indicateur" class="kp-select kp-select--light"></select>
-      </div>
-      <div id="graphe-bloc"></div>
-      <div id="tendance-note"></div>
     </div>
   </section>
 
@@ -1870,12 +1885,73 @@ main { max-width: 1240px; margin: 0 auto; padding: var(--sp-6) var(--sp-8) var(-
     </div>
   </section>
 
+  </section>
+
+  <section class="onglet" id="tendances" role="tabpanel" aria-labelledby="tab-tendances" tabindex="0">
+
+  <section class="bloc masque" id="bloc-tendances">
+    <div class="kp-panel">
+      <div class="kp-band kp-band--neutre">Évolution sur les derniers mois</div>
+      <div class="kp-toolbar">
+        <label class="kp-caps" for="sel-indicateur">Indicateur</label>
+        <select id="sel-indicateur" class="kp-select kp-select--light"></select>
+      </div>
+      <div id="graphe-bloc"></div>
+      <div id="tendance-note"></div>
+    </div>
+  </section>
+
+  </section>
+
+  <!-- AIDE (11/09/2026, demande DG) : ce pole n'avait jamais eu cet onglet. -->
+  <section class="onglet" id="aide" role="tabpanel" aria-labelledby="tab-aide" tabindex="0">
+
   <section class="bloc">
     <div class="kp-panel">
-      <div class="kp-band kp-band--neutre">Journal de traitement</div>
-      <p class="kp-body kp-secondary">Chaque fichier déposé est listé : reconnu, calculé, ignoré ou refusé — jamais de silence.</p>
-      <div id="journal" class="kp-log"></div>
+      <div class="kp-band kp-band--neutre">Notice — la routine mensuelle en quelques gestes</div>
+      <ol class="kp-body">
+        <li>Ouvrir l'application (double-clic) et déposer le fichier de sauvegarde de l'officine —
+        ou le retrouver dans « Reprendre où vous en étiez » s'il est déjà en mémoire.</li>
+        <li>Choisir la période dans l'en-tête, en haut à droite.</li>
+        <li>Dans « Déposer les fichiers », glisser l'état de stock détaillé et le CA par
+        sous-emplacement du mois. Le journal dit ce qui est reconnu.</li>
+        <li>Lire « Vue d'ensemble », ouvrir « Tendances » pour le mois précédent.</li>
+        <li>Télécharger la sauvegarde (bandeau en haut) — c'est elle qui porte l'historique.</li>
+      </ol>
+      <p class="kp-micro kp-muted">Pas de serveur, pas de base de données : le fichier de
+      sauvegarde est la seule mémoire de l'application. Le bandeau du haut passe à l'orange dès
+      qu'une analyse n'est pas sauvegardée, au rouge au-delà de deux.</p>
     </div>
+  </section>
+
+  <section class="bloc">
+    <div class="kp-panel">
+      <div class="kp-band kp-band--neutre">Quels fichiers déposer pour quel indicateur</div>
+      <table class="kp-table">
+        <thead><tr><th>Indicateur</th><th>Écran Médiciel</th><th>Ce qu'il vérifie</th></tr></thead>
+        <tbody>
+          <tr><td>Poids de la para dans le CA, marge</td><td>État CA par sous-emplacement, état
+          n°33</td><td>Sa période déclarée doit correspondre au mois affiché.</td></tr>
+          <tr><td>Stock para qui dort, périmés en para</td><td>État de stock détaillé, état
+          n°20 — les mêmes fichiers que le pôle Achat</td><td>Ces deux indicateurs republient ce
+          qu'Achat a déjà calculé sur les mêmes fichiers ; ils ne recalculent rien de nouveau.</td></tr>
+        </tbody>
+      </table>
+      <p class="kp-micro kp-muted">Un fichier de l'autre mois n'est jamais accepté en silence : le
+      module le refuse et le dit dans le journal, plutôt que de publier un chiffre daté à faux.</p>
+    </div>
+  </section>
+
+  <section class="bloc">
+    <div class="kp-panel">
+      <div class="kp-band kp-band--neutre">Ce que l'application ne fait pas</div>
+      <p class="kp-body">Elle n'invente aucun seuil (tout seuil non documenté est marqué
+      « à confirmer ») ; elle ne mélange jamais deux périodes ; elle n'affiche jamais deux
+      chiffres contradictoires pour le même indicateur ; elle ne publie jamais un chiffre sans le
+      fichier source qui l'a produit.</p>
+    </div>
+  </section>
+
   </section>
 
 </main>
@@ -8247,6 +8323,39 @@ document.getElementById("btn-telecharger").addEventListener("click", ()=>{
     setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
     journalLigne("ok","Résultat téléchargé : kpi_summary_"+k.kpi_id+".json.");
   }
+});
+
+/* ================= navigation par onglets (11/09/2026, demande DG) =================
+   Meme composant .kp-tabs/.kp-tab et meme mecanique que l'application Achat & Stock : la
+   feuille de style est partagee, ces regles .onglet/.onglet.actif existaient deja, inutilisees,
+   avant cet ajout. Pas d'ecran de detail par indicateur ici (contrairement a Achat) : aucun
+   cas special, la navigation clavier (fleches, Origine/Fin) est portee telle quelle. */
+const ONGLETS = Array.prototype.slice.call(document.querySelectorAll("#nav-onglets .kp-tab"));
+function allerA(ongletId){
+  ONGLETS.forEach(b=>{
+    const actif = b.dataset.onglet===ongletId;
+    b.classList.toggle("actif", actif);
+    b.setAttribute("aria-selected", actif ? "true" : "false");
+    b.tabIndex = actif ? 0 : -1;
+  });
+  document.querySelectorAll(".onglet").forEach(s=>s.classList.toggle("actif", s.id===ongletId));
+}
+ONGLETS.forEach((btn, i)=>{
+  btn.tabIndex = btn.classList.contains("actif") ? 0 : -1;
+  btn.addEventListener("click", ()=>allerA(btn.dataset.onglet));
+  btn.addEventListener("keydown", e=>{
+    let pas = 0;
+    if(e.key==="ArrowRight") pas = 1;
+    else if(e.key==="ArrowLeft") pas = -1;
+    else if(e.key==="Home"||e.key==="End") pas = 0;
+    else return;
+    e.preventDefault();
+    let j;
+    if(e.key==="Home"||e.key==="End") j = (e.key==="Home") ? 0 : ONGLETS.length-1;
+    else j = (i+pas+ONGLETS.length)%ONGLETS.length;
+    allerA(ONGLETS[j].dataset.onglet);
+    ONGLETS[j].focus();
+  });
 });
 
 /* ---------- thème ---------- */
