@@ -1846,11 +1846,37 @@ main { max-width: 1240px; margin: 0 auto; padding: var(--sp-6) var(--sp-8) var(-
        petite phrase grise a cote du titre, hors du regard. -->
   <div id="resume-depot"></div>
 
+  <!-- PROGRESSION (11/09/2026) : un dossier de 40 fichiers prenait des secondes sans le
+       moindre signe a l'ecran -- l'application semblait figee. Porte d'Achat tel quel. -->
+  <div id="progression" style="display:none">
+    <div class="kp-progress"><div class="kp-progress__fill" id="progression-barre"></div></div>
+    <span class="kp-progress__label" id="progression-texte"></span>
+  </div>
+
   <section class="bloc">
     <div class="kp-panel">
       <div class="kp-band kp-band--neutre">Journal de traitement</div>
       <p class="kp-body kp-secondary">Chaque fichier déposé est listé : reconnu, calculé, ignoré ou refusé — jamais de silence.</p>
+      <!-- FILTRES, COMPTEUR, RESUME ET EXPORTS (11/09/2026) : portes d'Achat, qui les avait
+           depuis toujours. Sans eux, retrouver les lignes REFUSE dans cinquante lignes de
+           journal relevait du courage, et rien ne sortait de l'ecran. -->
+      <p id="journal-resume" class="kp-body kp-secondary masque"></p>
+      <div class="kp-toolbar" id="journal-outils">
+        <div class="kp-toolbar__group">
+          <button class="kp-filter" type="button" data-filtre="tous" aria-pressed="true">Tous</button>
+          <button class="kp-filter" type="button" data-filtre="ok" aria-pressed="false"><span class="kp-log__mark kp-log__mark--reconnu" aria-hidden="true"></span>OK</button>
+          <button class="kp-filter" type="button" data-filtre="info" aria-pressed="false"><span class="kp-log__mark kp-log__mark--calcule" aria-hidden="true"></span>INFO</button>
+          <button class="kp-filter" type="button" data-filtre="warn" aria-pressed="false"><span class="kp-log__mark kp-log__mark--ignore" aria-hidden="true"></span>ALERTE</button>
+          <button class="kp-filter" type="button" data-filtre="err" aria-pressed="false"><span class="kp-log__mark kp-log__mark--refuse" aria-hidden="true"></span>REFUSÉ</button>
+        </div>
+        <div class="kp-toolbar__group">
+          <span class="kp-count" id="journal-compte"></span>
+          <button class="kp-btn kp-btn--secondary kp-btn--sm" type="button" id="btn-export-journal-csv">Exporter en CSV</button>
+          <button class="kp-btn kp-btn--secondary kp-btn--sm" type="button" id="btn-export-journal-md">Exporter en Markdown</button>
+        </div>
+      </div>
       <div id="journal" class="kp-log"></div>
+      <p id="journal-vide-filtre" class="kp-micro kp-muted masque">Aucune ligne ne correspond à ce filtre.</p>
     </div>
   </section>
 
@@ -7674,6 +7700,8 @@ const TITRES = {
   delai_ecoulement_para:"Stock para qui dort", peremptions_para:"Périmés en para" };
 
 /* ---------- journal ---------- */
+const POLE_TITRE = "Parapharmacie";
+const POLE_FICHIER = "Parapharmacie";
 const NIVEAUX = {
   ok:   { marque:"reconnu", mot:"OK" },
   info: { marque:"calcule", mot:"INFO" },
@@ -7693,10 +7721,23 @@ function journalLigne(niveau, message){
   const msg = document.createElement("span");
   msg.className = "kp-log__text"; msg.textContent = message;
   div.appendChild(puce); div.appendChild(niv); div.appendChild(msg);
+  // data-niveau : c'est LUI que lisent le filtre, le compteur et le resume (portes d'Achat
+  // le 11/09/2026). Sans cet attribut, filtrer le journal ne trouverait aucune ligne.
+  div.dataset.niveau = NIVEAUX[niveau] ? niveau : "info";
+  div.style.display = (filtreJournal==="tous" || filtreJournal===div.dataset.niveau) ? "" : "none";
   el.appendChild(div);
   el.scrollTop = el.scrollHeight;
+  mettreAJourCompteurJournal();
+  mettreAJourResumeJournal();
 }
-function journalVider(){ document.getElementById("journal").innerHTML = ""; }
+function journalVider(){
+  document.getElementById("journal").innerHTML = "";
+  filtreJournal = "tous";
+  document.querySelectorAll("#journal-outils .kp-filter[data-filtre]").forEach(b=>
+    b.setAttribute("aria-pressed", b.dataset.filtre==="tous" ? "true" : "false"));
+  mettreAJourCompteurJournal();
+  mettreAJourResumeJournal();
+}
 
 function esc(v){
   return String(v===null||v===undefined ? "" : v)
@@ -8072,7 +8113,9 @@ async function traiterDepot(fileList){
     .forEach(id=>document.getElementById(id).classList.add("masque"));
 
   const lot = [];
-  for(const f of files){
+  for(let idx=0; idx<files.length; idx++){
+    const f = files[idx];
+    afficherProgression(idx+1, files.length, f.name);
     if(String(f.name||"").indexOf("~$") === 0){
       journalLigne("info", f.name+" — fichier de verrouillage Excel, écarté.");
       continue;
@@ -8083,6 +8126,7 @@ async function traiterDepot(fileList){
       journalLigne("err", f.name+" — illisible : "+String((e&&e.message)||e));
     }
   }
+  afficherProgression(0, 0, ""); // lecture finie : la barre s'efface
   if(!lot.length){
     journalLigne("err","Aucun fichier exploitable dans ce dépôt.");
     document.getElementById("sous-titre-ecran").textContent = "Aucun fichier exploitable dans ce dépôt — voir le journal.";
@@ -8237,6 +8281,99 @@ function afficherResumeDepot(recus, exploitables, calcules){
       '<div class="kp-panel__body"><p class="kp-body">Voir l\'onglet <b>Vue d\'ensemble</b>.'+
       '</p></div></div>';
   }
+}
+
+/* ================= journal : filtres, compteur, resume, exports (11/09/2026) =================
+   Portes d'Achat a l'identique apres la remarque du DG : ces trois poles doivent se lire de la
+   meme facon. Seule adaptation : etat.periode ici, etat.periodeCourante la-bas. */
+let filtreJournal = "tous"; // tous | ok | info | warn | err
+function mettreAJourResumeJournal(){
+  const lignes = Array.from(document.querySelectorAll("#journal .kp-log__row"));
+  const el = document.getElementById("journal-resume");
+  if(!el) return;
+  if(!lignes.length){ el.textContent = ""; el.classList.add("masque"); return; }
+  const n = {ok:0, info:0, warn:0, err:0};
+  lignes.forEach(row=>{ if(n[row.dataset.niveau]!==undefined) n[row.dataset.niveau]++; });
+  el.textContent = lignes.length+" ligne"+(lignes.length>1?"s":"")+" de journal : "+
+    n.ok+" OK, "+n.info+" INFO, "+n.warn+" ALERTE (hors périmètre, normal), "+
+    n.err+" REFUSÉ (à vérifier).";
+  el.classList.remove("masque");
+}
+function mettreAJourCompteurJournal(){
+  const lignes = document.querySelectorAll("#journal .kp-log__row");
+  const visibles = Array.from(lignes).filter(row=>row.style.display!=="none");
+  const compte = document.getElementById("journal-compte");
+  if(compte) compte.textContent =
+    lignes.length ? visibles.length+" ligne"+(visibles.length>1?"s":"")+" sur "+lignes.length : "";
+  const vide = document.getElementById("journal-vide-filtre");
+  if(vide) vide.classList.toggle("masque", !(lignes.length>0 && visibles.length===0));
+}
+function appliquerFiltreJournal(){
+  document.querySelectorAll("#journal .kp-log__row").forEach(row=>{
+    row.style.display = (filtreJournal==="tous" || row.dataset.niveau===filtreJournal) ? "" : "none";
+  });
+  mettreAJourCompteurJournal();
+}
+function lignesJournalVisibles(){
+  return Array.from(document.querySelectorAll("#journal .kp-log__row"))
+    .filter(row=>row.style.display!=="none")
+    .map(row=>({
+      statut: row.querySelector(".kp-log__level").textContent,
+      message: row.querySelector(".kp-log__text").textContent
+    }));
+}
+function telechargerTexte(nom, contenu, type){
+  const blob = new Blob([contenu], {type});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = nom; document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+function champCSV(valeur){
+  const v = String(valeur);
+  return /[;"\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
+}
+function exporterJournalCSV(){
+  const lignes = lignesJournalVisibles();
+  if(!lignes.length){ alert("Aucune ligne à exporter avec ce filtre."); return; }
+  const corps = lignes.map(l=>champCSV(l.statut)+";"+champCSV(l.message)).join("\r\n");
+  // Le BOM (\ufeff) est OBLIGATOIRE : sans lui, Excel en francais lit le CSV en Windows-1252
+  // et les accents du journal arrivent casses chez le client.
+  telechargerTexte("Journal_"+POLE_FICHIER+"_"+etat.periode+".csv", "\ufeffStatut;Message\r\n"+corps, "text/csv;charset=utf-8");
+}
+function exporterJournalMarkdown(){
+  const lignes = lignesJournalVisibles();
+  if(!lignes.length){ alert("Aucune ligne à exporter avec ce filtre."); return; }
+  const echap = s=>String(s).replace(/\|/g,"\\|").replace(/\r?\n/g," ");
+  let md = "# Journal de traitement — "+POLE_TITRE+" — "+etat.periode+"\n\n";
+  if(filtreJournal!=="tous"){
+    const mots = {ok:"OK", info:"INFO", warn:"ALERTE", err:"REFUSÉ"};
+    md += "Filtre actif : "+mots[filtreJournal]+"\n\n";
+  }
+  md += "| Statut | Message |\n|---|---|\n";
+  md += lignes.map(l=>"| "+echap(l.statut)+" | "+echap(l.message)+" |").join("\n");
+  telechargerTexte("Journal_"+POLE_FICHIER+"_"+etat.periode+".md", md, "text/markdown;charset=utf-8");
+}
+document.querySelectorAll("#journal-outils .kp-filter[data-filtre]").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    filtreJournal = b.dataset.filtre;
+    document.querySelectorAll("#journal-outils .kp-filter[data-filtre]").forEach(bb=>
+      bb.setAttribute("aria-pressed", bb===b ? "true" : "false"));
+    appliquerFiltreJournal();
+  });
+});
+document.getElementById("btn-export-journal-csv").addEventListener("click", exporterJournalCSV);
+document.getElementById("btn-export-journal-md").addEventListener("click", exporterJournalMarkdown);
+
+// Barre de progression du depot (portee d'Achat) : sans elle, un dossier de quarante fichiers
+// laisse l'ecran immobile plusieurs secondes, ce qui se lit comme une panne.
+function afficherProgression(i, total, libelle){
+  const bloc = document.getElementById("progression");
+  if(!bloc) return;
+  if(total<=1){ bloc.style.display="none"; return; }
+  bloc.style.display = "flex";
+  document.getElementById("progression-texte").textContent = "Traitement "+i+"/"+total+" — "+libelle;
+  document.getElementById("progression-barre").style.width = Math.round(100*i/total)+"%";
 }
 
 const depot = document.getElementById("depot-fichiers");
