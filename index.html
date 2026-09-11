@@ -33,7 +33,7 @@ Blocs partages avec l'application officine, copies tels quels a la construction 
      noyau-lecture      SHA-1 53f9f91aba6c
      noyau-equivalences SHA-1 e4781ef666cd
      noyau-agregation   SHA-1 0abebc819aa4
-     noyau-sauvegarde   SHA-1 db8c682d9c92
+     noyau-sauvegarde   SHA-1 f1310f00862f
      noyau-cloud        SHA-1 212b4bbac115
      guide-collecte     SHA-1 df599532dde1
      lexique-note       SHA-1 fafe3bc584c3
@@ -3117,7 +3117,10 @@ function texteBandeau(officine){
   const d = officine.derniere_sauvegarde;
   const dTxt = d ? new Date(d).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "jamais";
   const n = officine.nb_analyses_non_sauvegardees||0;
-  return "Dernière sauvegarde : "+dTxt+" — "+n+" analyse"+(n>1?"s":"")+" non sauvegardée"+(n>1?"s":"");
+  // (cloud) quand la dernière sauvegarde est une poussée cloud réussie (11/09/2026) : sans ce
+  // mot, « Dernière sauvegarde » se lisait comme « dernier téléchargement du fichier ».
+  const src = officine.derniere_sauvegarde_source==="cloud" ? " (cloud)" : "";
+  return "Dernière sauvegarde : "+dTxt+src+" — "+n+" analyse"+(n>1?"s":"")+" non sauvegardée"+(n>1?"s":"");
 }
 function marquerAnalyseFaite(officine){ officine.nb_analyses_non_sauvegardees = (officine.nb_analyses_non_sauvegardees||0)+1; }
 function marquerSauvegarde(officine){ officine.derniere_sauvegarde = new Date().toISOString(); officine.nb_analyses_non_sauvegardees = 0; }
