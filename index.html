@@ -1813,7 +1813,13 @@ main { max-width: 1240px; margin: 0 auto; padding: var(--sp-6) var(--sp-8) var(-
       <span class="kp-drop__text">État de stock détaillé (n°20) et CA par sous-emplacement
       (n°33) — les mêmes exports Médiciel que le pôle Achat. Ou cliquer pour les choisir.</span>
     </div>
+    <p class="kp-body kp-secondary">
+      Le dossier a des sous-dossiers ? Le glisser-déposer ci-dessus peut les manquer selon le
+      navigateur — préférez ce bouton, plus fiable :
+      <button class="kp-btn kp-btn--secondary kp-btn--sm" id="btn-choisir-dossier" type="button">Choisir un dossier</button>
+    </p>
     <input type="file" id="fichiers-analyse" multiple class="masque">
+    <input type="file" id="dossier-analyse" webkitdirectory multiple class="masque">
     <p class="kp-micro kp-muted">Tout est lu dans ce navigateur : aucun fichier n'est téléversé.</p>
   </section>
 
@@ -8058,8 +8064,117 @@ depot.addEventListener("keydown", e=>{
 });
 depot.addEventListener("dragover", e=>{ e.preventDefault(); depot.classList.add("kp-drop--hover"); });
 ["dragleave","drop"].forEach(ev=>depot.addEventListener(ev, ()=>depot.classList.remove("kp-drop--hover")));
-depot.addEventListener("drop", e=>{ e.preventDefault(); traiterDepot(e.dataTransfer.files); });
+// Dépôt d'un DOSSIER entier (11/09/2026, demande DG : « dans l'appli Tréso on ne peut pas
+// importer un dossier entier »). Porté tel quel depuis le pôle Achat : dataTransfer.files est
+// une liste PLATE, le contenu des sous-dossiers déposés n'y est jamais ; on descend donc les
+// entrées récursivement, et un bouton « Choisir un dossier » offre le sélecteur natif.
+depot.addEventListener("drop", async e=>{
+  e.preventDefault();
+  depot.classList.add("kp-drop--busy");
+  try{
+    let files, erreurs, infos;
+    try{ ({files, erreurs, infos} = await fichiersDepuisDataTransfer(e.dataTransfer)); }
+    catch(exc){
+      journalVider();
+      journalLigne("err", "Lecture du dépôt interrompue par une erreur inattendue : "+
+        (exc && exc.message || exc)+". Réessayer, ou déposer les fichiers un par un.");
+      return;
+    }
+    await traiterDepot(files);
+    infos.forEach(msg=>journalLigne("info", msg));
+    erreurs.forEach(msg=>journalLigne("warn", msg));
+  } finally { depot.classList.remove("kp-drop--busy"); }
+});
 input.addEventListener("change", e=>traiterDepot(e.target.files));
+const inputDossier = document.getElementById("dossier-analyse");
+document.getElementById("btn-choisir-dossier").addEventListener("click", ()=>inputDossier.click());
+inputDossier.addEventListener("change", e=>traiterDepot(e.target.files));
+
+// Lecture récursive du dépôt (17/08/2026) : dataTransfer.files est une liste PLATE qui ne
+// contient jamais le contenu des sous-dossiers déposés — des fichiers grossistes réels, nichés
+// dans 05_conformite-saisie-BL/BL-grossistes/<grossiste>/, restaient donc invisibles à l'appli.
+// Utilise l'API DataTransferItemList/FileSystemEntry (Chrome/Edge, navigateur déjà ciblé par
+// cette appli) pour descendre dans tous les sous-dossiers ; repli sur la liste plate si le
+// navigateur ne supporte pas webkitGetAsEntry.
+async function fichiersDepuisDataTransfer(dataTransfer){
+  const erreurs = [];
+  // Traçabilité (17/08/2026) : compte les entrées lues sous-dossier par sous-dossier, pour
+  // qu'un blocage silencieux (session non rechargée, pagination readEntries() sur un gros
+  // sous-dossier) se voie d'un coup d'œil dans le journal au lieu de se deviner des heures
+  // plus tard sur un indicateur "non calculé" sans explication.
+  const infos = [];
+  if(!dataTransfer) return {files:[], erreurs, infos};
+  // Capture SYNCHRONE de dataTransfer.items avant tout `await` : le navigateur invalide le
+  // magasin de données du drag une fois la portion synchrone du handler terminée.
+  const items = dataTransfer.items ? Array.from(dataTransfer.items) : null;
+  const supporteEntrees = !!(items && items.length && items[0].webkitGetAsEntry);
+  if(!supporteEntrees){
+    const files = Array.from(dataTransfer.files||[]);
+    if(files.length) erreurs.push("Ce navigateur ne permet pas de lire le contenu des "+
+      "sous-dossiers déposés : seuls les fichiers de premier niveau ont été traités.");
+    return {files, erreurs, infos};
+  }
+  // Par élément, jamais globalement : webkitGetAsEntry() peut exister comme méthode mais
+  // renvoyer null pour tel ou tel élément (repli sur getAsFile() plutôt que perdre le fichier
+  // en silence — la présence de la méthode ne garantit pas une entrée exploitable partout).
+  const candidats = items.filter(it=>it.kind==="file").map(it=>({
+    entree: it.webkitGetAsEntry ? it.webkitGetAsEntry() : null,
+    secours: it.getAsFile ? it.getAsFile() : null
+  }));
+  function lireDossier(dirEntry){
+    return new Promise(resolve=>{
+      let reader;
+      try{ reader = dirEntry.createReader(); }
+      catch(exc){
+        erreurs.push("Sous-dossier « "+dirEntry.fullPath+" » : impossible d'y accéder ("+
+          (exc && exc.message || exc)+"), ignoré.");
+        resolve([]); return;
+      }
+      const tout = [];
+      (function lot(){
+        try{
+          reader.readEntries(entrees=>{
+            if(!entrees.length){
+              infos.push("Sous-dossier « "+dirEntry.fullPath+" » : "+tout.length+" élément(s) lu(s).");
+              resolve(tout); return;
+            }
+            tout.push(...entrees);
+            lot(); // rappel OBLIGATOIRE jusqu'à un lot vide (piège connu de l'API)
+          }, err=>{ erreurs.push("Sous-dossier « "+dirEntry.fullPath+" » : lecture "+
+            "interrompue, contenu déjà lu conservé."); resolve(tout); });
+        } catch(exc){
+          erreurs.push("Sous-dossier « "+dirEntry.fullPath+" » : erreur inattendue ("+
+            (exc && exc.message || exc)+"), contenu déjà lu conservé.");
+          resolve(tout);
+        }
+      })();
+    });
+  }
+  function fichierDepuisEntree(fileEntry){
+    return new Promise(resolve=>{
+      fileEntry.file(resolve, err=>{
+        erreurs.push("Fichier « "+fileEntry.fullPath+" » : illisible, ignoré.");
+        resolve(null);
+      });
+    });
+  }
+  async function explorer(entree, acc){
+    try{
+      if(entree.isFile){ const f = await fichierDepuisEntree(entree); if(f) acc.push(f); }
+      else if(entree.isDirectory){ for(const e of await lireDossier(entree)) await explorer(e, acc); }
+    } catch(exc){
+      erreurs.push("« "+(entree.fullPath||entree.name)+" » : erreur inattendue ("+
+        (exc && exc.message || exc)+"), ignoré.");
+    }
+  }
+  const files = [];
+  for(const c of candidats){
+    if(c.entree) await explorer(c.entree, files);
+    else if(c.secours) files.push(c.secours);
+  }
+  infos.unshift(files.length+" fichier(s) trouvé(s) au total dans le dépôt (sous-dossiers compris).");
+  return {files, erreurs, infos};
+}
 
 /* ---------- sortie ---------- */
 document.getElementById("btn-telecharger").addEventListener("click", ()=>{
