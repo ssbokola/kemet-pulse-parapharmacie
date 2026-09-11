@@ -1635,6 +1635,13 @@ main { max-width: 1240px; margin: 0 auto; padding: var(--sp-6) var(--sp-8) var(-
 .kp-badge-demo { background: var(--kemet-or); color: var(--text-on-gold); font-size: 11px;
   font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 4px 10px;
   border-radius: 999px; white-space: nowrap; }
+#pieces-du-mois .gc-details { margin: 8px 0 0; }
+#pieces-du-mois .gc-summary { cursor: pointer; font-weight: 700; padding: 10px 12px; border: 1px solid var(--kp-bord, #ddd6cd);
+  border-radius: 8px; list-style: none; display: flex; align-items: center; gap: 8px; }
+#pieces-du-mois .gc-summary::-webkit-details-marker { display: none; }
+#pieces-du-mois .gc-summary::before { content: 'B8'; opacity: .7; }
+#pieces-du-mois .gc-details[open] .gc-summary::before { content: 'BE'; }
+#pieces-du-mois .gc-details[open] .gc-summary { margin-bottom: 8px; }
 #pieces-du-mois .gc-groupe { border: 1px solid var(--kp-bord, #ddd6cd); border-radius: 8px;
   padding: 12px 14px; margin: 0 0 12px 0; }
 #pieces-du-mois .gc-groupe--servi { opacity: .72; }
@@ -7802,6 +7809,12 @@ function rendrePiecesDuMois(){
     ' indispensables — ce sont les MÊMES fichiers que le groupe 1 du pôle Achat.</p>';
 
   for(const g of GC.GROUPES_PARAPHARMACIE){
+  // REPLIE PAR DEFAUT (11/09/2026, demande DG) : la liste des pieces, avec ses captures
+  // d'ecran Mediciel, tombait en entier des la creation d'une officine, avant tout depot --
+  // trois ecrans d'images qu'on n'avait pas demandes. Elle reste a sa place, fermee : le
+  // resume dit ce qui manque, un clic ouvre le detail. Les images sont en loading=lazy,
+  // elles ne se chargent qu'a l'ouverture.
+  html += '<details class="gc-details"><summary class="gc-summary">'+esc(manquantes.length ? 'Voir les pièces à fournir ('+manquantes.length+' manquante'+(manquantes.length>1?'s':'')+')' : 'Voir la liste des pièces (tout est reçu)')+'</summary>';
     const refsGroupe = g.pieces.map(p=>p.ref);
     const recues = refsGroupe.filter(r=>vues.has(r) && !partielles[r]).length;
     html += '<div class="gc-groupe'+(recues === refsGroupe.length ? ' gc-groupe--servi' : '')+'">'+
@@ -7831,6 +7844,7 @@ function rendrePiecesDuMois(){
     }
     html += '</div>';
   }
+  html += '</details>';
   cont.innerHTML = html + '</div></div>';
 }
 
