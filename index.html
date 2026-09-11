@@ -1807,6 +1807,8 @@ main { max-width: 1240px; margin: 0 auto; padding: var(--sp-6) var(--sp-8) var(-
        remplie par rendrePiecesDuMois(), se coche au fil des dépôts. -->
   <section class="bloc" id="pieces-du-mois"></section>
 
+  <div id="alerte-periode"></div>
+
   <section class="bloc">
     <div class="kp-drop" id="depot-fichiers" role="button" tabindex="0">
       <span class="kp-drop__title">Déposer ici les fichiers du mois</span>
@@ -6540,11 +6542,13 @@ async function calculer(fichiers, config){
 
     // ---- le fichier CA, reconnu par son en-tête, contrôlé sur sa période ----
     let src = null, ecartesPeriode = [];
+    let periodeRejeteePara = null;
     for(const f of lus){
       if(!estExportCA(f.rows)) continue;
       const per = periodeDuFichier(f.rows);
       if(per && (per.m !== M || per.y !== Y)){
         ecartesPeriode.push(f.nom+" (déclare "+String(per.m).padStart(2,"0")+"/"+per.y+")");
+        if(!periodeRejeteePara) periodeRejeteePara = {mois:per.m, annee:per.y};
         continue;
       }
       if(!src) src = f;
@@ -6556,7 +6560,8 @@ async function calculer(fichiers, config){
     if(!src){
       log("err","Analyse impossible : l'export « CHIFFRE D'AFFAIRE PAR SOUS-EMPLACEMENT » (état "+
         "n°33) de "+MTIT[M]+" "+Y+" n'a pas été déposé, ou celui déposé n'est pas du bon mois.");
-      return {erreur:true, journal:journal, pieces_vues:[...pieces]};
+      return {erreur:true, journal:journal, pieces_vues:[...pieces],
+              periode_rejetee: periodeRejeteePara || undefined};
     }
     const parse = parseSousEmpl(src.rows);
     if(parse.erreur){
@@ -6570,7 +6575,8 @@ async function calculer(fichiers, config){
       log("err","Analyse impossible : la période du fichier ("+String(parse.per.m).padStart(2,"0")+
         "/"+parse.per.y+") ne correspond pas au mois demandé ("+String(M).padStart(2,"0")+"/"+Y+
         "). Réexporter le CA par sous-emplacement du mois.");
-      return {erreur:true, journal:journal, pieces_vues:[...pieces]};
+      return {erreur:true, journal:journal, pieces_vues:[...pieces],
+              periode_rejetee:{mois:parse.per.m, annee:parse.per.y}};
     }
     vu(PIECES_VUES.ca_sous_emplacement);
     log("ok", src.nom+" — CA par sous-emplacement reconnu, "+parse.items.length+" sous-emplacement(s).");
@@ -7963,9 +7969,20 @@ function tracer(cle){
 }
 
 /* ---------- le dépôt ---------- */
+// Rejoue le meme bouton " — TITULAIRE" que le changement manuel de periode
+// (ligne ci-dessus, addEventListener("change", ...)) -- une seule chaine, deux usages.
+const TITRE_SUFFIXE = " — Parapharmacie";
+let dernierFichiers = null; // pour rejouer le meme depot apres bascule de periode
 async function traiterDepot(fileList){
   const files = Array.from(fileList||[]);
-  if(!files.length) return;
+  if(!files.length){
+    journalVider();
+    journalLigne("warn", "Aucun fichier n'a été déposé (dossier vide, ou sélection annulée).");
+    document.getElementById("sous-titre-ecran").textContent = "Aucun fichier reçu — réessayer le dépôt.";
+    return;
+  }
+  dernierFichiers = files;
+  document.getElementById("alerte-periode").innerHTML = "";
   journalVider();
   etat.resultats = [];
   ["bloc-cartes","bloc-detail","bloc-lecture","bloc-sortie"]
@@ -7983,10 +8000,15 @@ async function traiterDepot(fileList){
       journalLigne("err", f.name+" — illisible : "+String((e&&e.message)||e));
     }
   }
-  if(!lot.length){ journalLigne("err","Aucun fichier exploitable dans ce dépôt."); return; }
+  if(!lot.length){
+    journalLigne("err","Aucun fichier exploitable dans ce dépôt.");
+    document.getElementById("sous-titre-ecran").textContent = "Aucun fichier exploitable dans ce dépôt — voir le journal.";
+    return;
+  }
   journalLigne("info", lot.length+" fichier(s) déposé(s). Les modules du pôle vont y chercher "+
     "ce qu'ils reconnaissent.");
 
+  const rejetsPeriode = [];
   const vuesDepot = new Set();
   const partiellesDepot = {};
   // SEULS les modules de la liste blanche produisent une carte de ce pôle. "delai_ecoulement"
@@ -8015,6 +8037,7 @@ async function traiterDepot(fileList){
       continue;
     }
     (res.journal||[]).forEach(j=>journalLigne(j.niv||"info", "["+module.titre+"] "+j.msg));
+    if(res.periode_rejetee) rejetsPeriode.push(res.periode_rejetee);
     (res.pieces_vues||[]).forEach(r=>vuesDepot.add(r));
     Object.assign(partiellesDepot, res.pieces_partielles || {});
     if(res.erreur || !res.kpiSummary) continue;
@@ -8032,6 +8055,7 @@ async function traiterDepot(fileList){
     off.pieces_partielles_mensuel[etat.periode] = partiellesDepot;
   }
   rendrePiecesDuMois();
+  afficherAlertePeriode(rejetsPeriode);
 
   if(etat.resultats.length){
     SV.marquerAnalyseFaite(MEM.etat.officine);
@@ -8054,6 +8078,41 @@ async function traiterDepot(fileList){
     ? ("Analyse produite le "+new Date().toLocaleDateString("fr-FR")+" · "+n+" indicateur(s) "+
        "calculé(s) sur "+modules.length+" installé(s)")
     : "Aucun indicateur n'a pu être calculé — voir le journal.";
+}
+
+// Alerte periode (11/09/2026, capture DG : depot d'aout sans effet visible pendant que
+// septembre etait affiche -- chaque module refusait en silence relatif, la seule trace
+// vivant tout en bas dans le Journal de traitement). Construite a partir des rejets de
+// periode remontes par les modules (periode_rejetee), jamais d'un texte regex-parsed.
+function afficherAlertePeriode(rejets){
+  const cont = document.getElementById("alerte-periode");
+  if(!cont) return;
+  if(!rejets.length){ cont.innerHTML = ""; return; }
+  const comptes = new Map();
+  rejets.forEach(r=>{
+    const cle = r.annee+"-"+String(r.mois).padStart(2,"0");
+    comptes.set(cle, (comptes.get(cle)||0)+1);
+  });
+  let meilleure = null, max = 0;
+  comptes.forEach((n,cle)=>{ if(n>max){ max=n; meilleure=cle; } });
+  if(!meilleure || meilleure === etat.periode){ cont.innerHTML = ""; return; }
+  cont.innerHTML =
+    '<div class="kp-panel" style="margin-bottom:12px">'+
+    '<div class="kp-band kp-band--vigilance">Les fichiers déposés ne sont pas du mois affiché</div>'+
+    '<div class="kp-panel__body">'+
+    '<p class="kp-body">Les fichiers déposés semblent être de <b>'+esc(moisLisibleCap(meilleure))+
+    '</b>, mais la période affichée est <b>'+esc(moisLisibleCap(etat.periode))+'</b> — c\'est '+
+    'pour ça qu\'aucun indicateur n\'est sorti (le détail exact est dans le journal, en bas).</p>'+
+    '<button class="kp-btn kp-btn--primary kp-btn--sm" id="btn-periode-basculer" type="button">'+
+    'Passer à '+esc(moisLisibleCap(meilleure))+' et relancer</button></div></div>';
+  document.getElementById("btn-periode-basculer").addEventListener("click", async ()=>{
+    const sel = document.getElementById("sel-periode");
+    sel.value = meilleure;
+    etat.periode = meilleure;
+    document.getElementById("titre-ecran").textContent = moisLisibleCap(meilleure)+TITRE_SUFFIXE;
+    cont.innerHTML = "";
+    if(dernierFichiers) await traiterDepot(dernierFichiers);
+  });
 }
 
 const depot = document.getElementById("depot-fichiers");
