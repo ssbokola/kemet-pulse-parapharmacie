@@ -29,11 +29,11 @@ Aucun serveur, aucune base, aucune bibliotheque distante : tout est lu dans ce
 navigateur, et le programme lui-meme est dans ce fichier.
 
 Blocs partages avec l'application officine, copies tels quels a la construction :
-     noyau-util         SHA-1 2ee284652f0c
+     noyau-util         SHA-1 cea2c924a7ab
      noyau-lecture      SHA-1 53f9f91aba6c
      noyau-equivalences SHA-1 e4781ef666cd
      noyau-agregation   SHA-1 0abebc819aa4
-     noyau-sauvegarde   SHA-1 ef19c653bc5f
+     noyau-sauvegarde   SHA-1 9faf96353278
      noyau-cloud        SHA-1 212b4bbac115
      guide-collecte     SHA-1 df599532dde1
      lexique-note       SHA-1 fafe3bc584c3
@@ -2038,7 +2038,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 // rapports remis au client. Avec vingt abonnés sur des versions différentes, « quelle
 // version a mon client ? » doit avoir une réponse. Le banc test_version.js refuse la
 // publication si une source a été modifiée APRÈS cette date.
-const APP_VERSION = "1.2.2";
+const APP_VERSION = "1.2.3";
 const APP_DATE = "2026-09-15";
 
 /* ---------- primitives façon Python (portées de conformite-bl-app.html) ---------- */
@@ -3243,6 +3243,24 @@ function marquerSauvegarde(officine){ officine.derniere_sauvegarde = new Date().
 
 /* ---------- nom de fichier proposé ---------- */
 function slugifie(s){ return U.normLibre(s||"officine").toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"")||"officine"; }
+// Fiche PRETE A SORTIR DE L'APPAREIL (15/09/2026, accord DG). Le fichier de sauvegarde est
+// ecrit EN CLAIR par construction : c'est le seul recours quand le code est perdu, il ne peut
+// donc pas dependre de lui. Y laisser `_cloud_local` revenait a protéger l'accès cloud par les
+// 5 chiffres seuls -- 100 000 combinaisons, cassables hors ligne en quelques heures, alors que
+// le modèle repose sur 600 000 itérations PBKDF2 sur un code de 20 caractères.
+// On retire les CLÉS. On garde le HANDLE : ce n'est pas un secret (c'est un pointeur public),
+// et le 15/09/2026 a montré qu'il ne vit nulle part ailleurs qu'au fond du blob chiffré
+// d'IndexedDB — vider IndexedDB le perdait, rendant le code de récupération inutilisable faute
+// de savoir à quelle officine l'appliquer. Ce fichier devient sa trace hors ligne.
+const SECRETS_CLOUD_HORS_FICHIER = ["_cloud_local", "_cloud_version"];
+function officinePourExport(officine){
+  const copie = JSON.parse(JSON.stringify(officine));
+  if(copie && copie.config){
+    SECRETS_CLOUD_HORS_FICHIER.forEach(k=>{ delete copie.config[k]; });
+  }
+  return copie;
+}
+
 function nomFichierSauvegarde(officine){
   const d = new Date().toISOString().slice(0,10);
   return "sauvegarde_"+slugifie(officine.config.nom_pharmacie)+"_"+d+".json";
@@ -3664,6 +3682,7 @@ glob.KemetSauvegarde = {
   etatBandeau, texteBandeau, marquerAnalyseFaite, marquerSauvegarde,
   slugifie, nomFichierSauvegarde, nouvelIdentifiant, cleDe, adopterOfficine,
   compareVersions,
+  officinePourExport, SECRETS_CLOUD_HORS_FICHIER,
   secoursEcrire, secoursLire, secoursLister, secoursListerDetail, secoursSupprimer,
   memoireDisponible, demanderPersistance, persistanceAccordee,
   chiffrementDisponible, preparerVerrou, ouvrirVerrou,
