@@ -1,5 +1,5 @@
 /* Service worker de Kemet Pulse — Parapharmacie -- PRODUIT PAR construire-pwa.py, ne pas editer a la main.
-   Version applicative : 1.4.0 (2026-09-16)
+   Version applicative : 1.4.1 (2026-09-16)
 
    RAISON D'ETRE : sans service worker + manifeste, Chrome refuse navigator.storage.persist(),
    et le stockage local reste eligible a l'eviction. C'est exactement ce qui a fait disparaitre
@@ -8,7 +8,7 @@
    REGLE ABSOLUE : ne JAMAIS servir une version perimee de l'application. Meme origine = reseau
    d'abord, cache uniquement quand le reseau est injoignable. Une application figee sur une
    vieille version serait pire que le defaut qu'on corrige. */
-const VERSION = "1.4.0";
+const VERSION = "1.4.1";
 const CACHE = "kemet-pulse-parapharmacie-" + VERSION;
 
 // URL epinglees et versionnees : leur contenu ne change jamais, le cache peut donc primer.

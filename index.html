@@ -34,11 +34,11 @@ Aucun serveur, aucune base, aucune bibliotheque distante : tout est lu dans ce
 navigateur, et le programme lui-meme est dans ce fichier.
 
 Blocs partages avec l'application officine, copies tels quels a la construction :
-     noyau-util         SHA-1 46ca5cf96003
+     noyau-util         SHA-1 3a1097181249
      noyau-lecture      SHA-1 53f9f91aba6c
      noyau-equivalences SHA-1 e4781ef666cd
      noyau-agregation   SHA-1 0abebc819aa4
-     noyau-sauvegarde   SHA-1 9faf96353278
+     noyau-sauvegarde   SHA-1 1e0867c706b9
      noyau-cloud        SHA-1 212b4bbac115
      guide-collecte     SHA-1 df599532dde1
      lexique-note       SHA-1 fafe3bc584c3
@@ -2043,7 +2043,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 // rapports remis au client. Avec vingt abonnés sur des versions différentes, « quelle
 // version a mon client ? » doit avoir une réponse. Le banc test_version.js refuse la
 // publication si une source a été modifiée APRÈS cette date.
-const APP_VERSION = "1.4.0";
+const APP_VERSION = "1.4.1";
 const APP_DATE = "2026-09-16";
 
 /* ---------- primitives façon Python (portées de conformite-bl-app.html) ---------- */
@@ -3208,6 +3208,18 @@ function adopterOfficine(officine, cleTrouvee){
 }
 
 /* ---------- upsert par période : relancer un mois écrase sa ligne, jamais de doublon ---------- */
+// Charge utile des DOCUMENTS, par periode (16/09/2026). Branche SEPAREE de historique_mensuel :
+// le kpi_summary est un contrat, lu par l'agregateur et par l'export cabinet, et on n'y ajoute
+// pas des champs pour les besoins d'un Word. Ce qu'on garde ici est volontairement minuscule --
+// les compteurs dont une note a besoin, jamais les listes de produits.
+// Cle FACULTATIVE : une fiche qui ne la porte pas s'ouvre exactement comme avant.
+function upsertLivrable(officine, periode, kpiId, charge){
+  if(!officine || !periode || !kpiId || !charge) return;
+  if(!officine.livrables_mensuel) officine.livrables_mensuel = {};
+  if(!officine.livrables_mensuel[periode]) officine.livrables_mensuel[periode] = {};
+  officine.livrables_mensuel[periode][kpiId] = charge;
+}
+
 function upsertPeriode(officine, periode, kpiId, kpiSummary){
   if(!officine.historique_mensuel[periode]) officine.historique_mensuel[periode] = {};
   officine.historique_mensuel[periode][kpiId] = kpiSummary;
@@ -3699,7 +3711,7 @@ function etatSynchro(officine){
 }
 
 glob.KemetSauvegarde = {
-  SCHEMA_VERSION, officineVierge, upsertPeriode, periodesTriees,
+  SCHEMA_VERSION, officineVierge, upsertPeriode, upsertLivrable, periodesTriees,
   memoriserEquivalence, importerHistoriqueExistant, NOMS_HISTORIQUES_CONNUS,
   etatBandeau, texteBandeau, marquerAnalyseFaite, marquerSauvegarde,
   slugifie, nomFichierSauvegarde, nouvelIdentifiant, cleDe, adopterOfficine,
