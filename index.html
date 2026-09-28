@@ -34,13 +34,13 @@ Aucun serveur, aucune base, aucune bibliotheque distante : tout est lu dans ce
 navigateur, et le programme lui-meme est dans ce fichier.
 
 Blocs partages avec l'application officine, copies tels quels a la construction :
-     noyau-util         SHA-1 3a1097181249
-     noyau-lecture      SHA-1 53f9f91aba6c
+     noyau-util         SHA-1 2038c0c98bad
+     noyau-lecture      SHA-1 495502d81a9d
      noyau-equivalences SHA-1 e4781ef666cd
-     noyau-agregation   SHA-1 0abebc819aa4
-     noyau-sauvegarde   SHA-1 1e0867c706b9
+     noyau-agregation   SHA-1 bf1537e1a8bd
+     noyau-sauvegarde   SHA-1 750e1874e1ea
      noyau-cloud        SHA-1 212b4bbac115
-     guide-collecte     SHA-1 df599532dde1
+     guide-collecte     SHA-1 d6a4ff78f04c
      lexique-note       SHA-1 fafe3bc584c3
      modules-registre   SHA-1 7bad12a353a3
      lib-xlsx           SHA-1 7f749f81a45a
@@ -2043,8 +2043,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 // rapports remis au client. Avec vingt abonnés sur des versions différentes, « quelle
 // version a mon client ? » doit avoir une réponse. Le banc test_version.js refuse la
 // publication si une source a été modifiée APRÈS cette date.
-const APP_VERSION = "1.4.1";
-const APP_DATE = "2026-09-16";
+const APP_VERSION = "1.4.2";
+const APP_DATE = "2026-09-28";
 
 /* ---------- primitives façon Python (portées de conformite-bl-app.html) ---------- */
 
@@ -2295,6 +2295,62 @@ function signatureFichier(buf){
   return "inconnu";
 }
 
+/* UN CLASSEUR PROTEGE PAR MOT DE PASSE PORTE LA MEME SIGNATURE QU'UN .xls — D0CF11E0 — parce
+   que le conteneur OLE n'est alors qu'une ENVELOPPE autour du paquet chiffre. La signature ne
+   suffit donc pas a les distinguer, et c'est exactement la confusion qui a fait annoncer le
+   journal de banque du Gerant comme un fichier abime (28/09/2026).
+   On regarde donc le CONTENU du conteneur : un paquet chiffre ECMA-376 porte deux entrees de
+   repertoire nommees en UTF-16LE, « EncryptionInfo » et « EncryptedPackage ». Un .xls binaire
+   ordinaire porte « Workbook » ou « Book ».
+   POURQUOI PAS SEULEMENT LE MESSAGE DE LA BIBLIOTHEQUE : parce que c'est precisement ce qui
+   etait teste, et que la formulation avait change sous le test. Un controle structurel ne
+   depend d'aucune tournure de phrase et survivra a la prochaine version de SheetJS.
+   Mesure le 28/09/2026 : vrai sur les 2 copies du journal, faux sur 4 exports .xls Copharmed
+   reels. Balayage lineaire, appele UNIQUEMENT apres l'echec d'une lecture — jamais dans la
+   boucle des centaines de classeurs d'un depot. */
+function porteEnveloppeChiffree(buf){
+  const u = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  // 1. la signature du conteneur. Sans elle, ce n'est pas un conteneur OLE du tout.
+  if(u.length < 8 || u[0]!==0xD0 || u[1]!==0xCF || u[2]!==0x11 || u[3]!==0xE0 ||
+     u[4]!==0xA1 || u[5]!==0xB1 || u[6]!==0x1A || u[7]!==0xE1) return false;
+  // 2. LES DEUX entrées, pas une. Un paquet chiffré ECMA-376 porte toujours le couple.
+  //    CORRIGÉ LE 28/09/2026 — la première version ne cherchait que « EncryptionInfo », et
+  //    n'importe où dans le fichier : un faux .xls abîmé contenant cette chaîne était annoncé
+  //    au Gérant comme protégé par mot de passe. Mesuré, reproduit. Mon commentaire décrivait
+  //    déjà le contrôle ci-dessous ; le code, lui, ne le faisait pas.
+  return nomUtf16Present(u, "EncryptionInfo") && nomUtf16Present(u, "EncryptedPackage");
+}
+
+/* Cherche un nom d'entrée de répertoire OLE, écrit en UTF-16LE. Balayage linéaire, appelé
+   UNIQUEMENT après l'échec d'une lecture — jamais dans la boucle des centaines de classeurs
+   d'un dépôt. */
+function nomUtf16Present(u, cible){
+  const n = cible.length, c0 = cible.charCodeAt(0);
+  for(let i = 0; i + n*2 <= u.length; i++){
+    if(u[i] !== c0 || u[i+1] !== 0) continue;             // filtre rapide sur le 1er caractère
+    let ok = true;
+    for(let k = 1; k < n; k++){
+      if(u[i+2*k] !== cible.charCodeAt(k) || u[i+2*k+1] !== 0){ ok = false; break; }
+    }
+    if(ok) return true;
+  }
+  return false;
+}
+
+/* CE QUI DOIT ÊTRE ÉCRIT DANS LE JOURNAL DE TRAITEMENT, ET EN ENTIER.
+   POSÉ LE 28/09/2026, après une mesure désagréable : le message d'erreur écrit le matin même
+   faisait 285 caractères, et les DIX points d'affichage des modules le coupaient à 70 ou 80.
+   Le Gérant lisait donc une phrase tranchée en plein milieu, qui perdait à la fois la consigne
+   et l'explication. Le correctif était juste dans le code et invisible à l'écran.
+   LA RÈGLE : un message RÉDIGÉ PAR L'APPLICATION est déjà calibré, on ne le tronque pas. Seul
+   un message de BIBLIOTHÈQUE, dont personne ne connaît la longueur, se borne — et la coupe se
+   voit, avec des points de suspension. */
+function messagePourJournal(e, borne){
+  const m = String((e && e.message) || e);
+  if(e && e.kemetTexteEntier) return m;
+  return (typeof borne === "number" && m.length > borne) ? m.slice(0, borne) + "…" : m;
+}
+
 /* ---------- lecture d'un classeur avec cascade de réparation ---------- */
 // Rend {rows, date1904, feuilles, feuilleActive} ou lève avec un message clair (JAMAIS
 // un échec silencieux — le journal de traitement doit pouvoir citer le motif exact).
@@ -2385,16 +2441,40 @@ async function parserClasseur(buf, opts){
     catch(e){ tentatives.push(label+" : "+(e.message||e)); return false; }
   }
   if(sig==="ole"){
-    // OLE : soit .xls binaire (SheetJS le lit), soit un classeur CHIFFRÉ (Agile Encryption,
-    // hors périmètre v1 — cf. décision DG §3b). On tente la lecture directe ; SheetJS lève
-    // un message contenant "encrypt" si c'est le cas, qu'on distingue explicitement.
+    // OLE : TROIS fichiers très différents portent cette même signature — un .xls binaire
+    // (SheetJS le lit), un classeur PROTÉGÉ PAR MOT DE PASSE (le conteneur OLE n'est alors
+    // qu'une enveloppe autour du paquet chiffré), et un .xls abîmé. Les distinguer n'est pas
+    // cosmétique : c'est le journal de banque du Gérant qui arrive ici.
     if(!essayer(buf,"lecture .xls directe")){
       const msg = tentatives[tentatives.length-1]||"";
-      if(/encrypt/i.test(msg)){
-        throw new Error("Classeur protégé par mot de passe (chiffrement Office). "+
-          "Hors périmètre de cette version : exporter une copie non protégée.");
+      // DEUX TESTS, ET C'EST DÉLIBÉRÉ (28/09/2026). Le précédent code ne testait que
+      // /encrypt/i sur le message de la bibliothèque ; or SheetJS 0.18.5 dit exactement
+      // « File is password-protected », sans ce mot. La branche n'a donc JAMAIS pu se
+      // déclencher, et le journal de banque — parfaitement valide — était annoncé au Gérant
+      // comme « possiblement partiellement corrompu ». Mesuré sur ses deux copies du journal.
+      // Le second test ne dépend d'aucune formulation : voir porteEnveloppeChiffree().
+      if(/password|encrypt/i.test(msg) || porteEnveloppeChiffree(buf)){
+        // CE LECTEUR NE DÉCHIFFRE PAS, ET NE LE PRÉTEND PAS. Vérifié le 28/09/2026 : le bloc
+        // lib-xlsx porte le POINT D'ACCROCHE du déchiffrement ECMA-376
+        // (« typeof decrypt_std76 !== "undefined" ») mais aucune implémentation — 0 définition
+        // pour 2 références. Passer `password:` à XLSX.read ne change RIEN : même message,
+        // mesuré sur le journal réel. Le déchiffrement appartient au module de rapprochement
+        // bancaire, qui ouvre le paquet lui-même et remet ici des octets en clair.
+        // LA CONSIGNE D'ABORD, L'EXPLICATION ENSUITE — et pas par goût du style : même
+        // tronqué à 70 caractères par un point d'affichage, ce texte doit rester vrai et
+        // utile. Au FUTUR pour le journal : le module de rapprochement bancaire n'est posé
+        // dans aucune des quatre applications au 28/09/2026, et aucune interface ne permet
+        // encore d'enregistrer le mot de passe dans la fiche. Annoncer au présent une
+        // capacité qui n'existe pas enverrait le Gérant vers un champ introuvable.
+        const err = new Error("Classeur protégé par un mot de passe : déposer une copie non "+
+          "protégée. Ce lecteur ne déchiffre pas. Le journal de banque sera l'exception — le "+
+          "module de rapprochement bancaire l'ouvrira avec le mot de passe enregistré dans la "+
+          "fiche de l'officine — mais ce module n'est pas encore posé.");
+        err.kemetTexteEntier = true;   // rédigé ici, calibré ici : ne pas le tronquer
+        throw err;
       }
-      throw new Error("Classeur .xls illisible ("+msg+"). Fichier possiblement "+
+      throw new Error("Classeur OLE illisible ("+msg+"). Ce n'est pas un classeur protégé : "+
+        "ni le message de lecture, ni le conteneur ne l'indiquent. Fichier possiblement "+
         "partiellement corrompu (cas connu des exports .xls Copharmed).");
     }
   } else if(sig==="html-deguise"){
@@ -2535,7 +2615,8 @@ async function lireTexteWindows1252(file){
 }
 
 glob.KemetLecture = {
-  reparerBiltinId, tronquerEOCD, signatureFichier,
+  reparerBiltinId, tronquerEOCD, signatureFichier, porteEnveloppeChiffree,
+  messagePourJournal,
   lireClasseur, feuilleEnLignes, lireFeuilleParNom,
   remettreCompteurLecture: function(){ _classeursOuverts = 0; },
   trouverLigneEntete, trouverColonne, KEYWORDS_MAP_SOCLE,
@@ -2926,7 +3007,22 @@ function ecartsCoherence(kid, s, historiques, entry, period){
 // historiqueMensuel (5e paramètre, ajouté le 18/08/2026) : officine.historique_mensuel, pour
 // que les courbes s'appuient sur les mois déjà analysés DANS l'application. Paramètre
 // optionnel — les bancs qui appellent construireDash à quatre arguments restent valides.
-function construireDash(kpiSummaries, historiques, period, client, historiqueMensuel){
+/* `config` (6e paramètre, ajouté le 25/09/2026) : la fiche de l'officine, pour son bloc
+   `pilotage`. Il est FACULTATIF et les appelants qui ne le passent pas gardent le comportement
+   d'avant — mais alors le registre de couverture est le registre COMPLET, donc la couverture est
+   sous-évaluée et le verrou se ferme trop souvent. Un KPI retiré par décision du client
+   (`kpi_hors_perimetre`) doit sortir du numérateur ET du dénominateur : le compter absent
+   dégraderait mécaniquement la couverture et suspendrait un verdict pour une mauvaise raison.
+   L'officine pilote en a trois dans sa fiche ; la liste vient d'elle, jamais du code. */
+function construireDash(kpiSummaries, historiques, period, client, historiqueMensuel, config, asOf){
+  const pilotage = ((config||{}).pilotage) || {};
+  // Surchargeable par la fiche, comme côté Python (config_client.json > pilotage).
+  const SEUIL_COUVERTURE = (function(){
+    const v = parseFloat(pilotage.seuil_couverture);
+    return (isFinite(v) && v > 0 && v <= 1) ? v : 0.70;
+  })();
+  const HORS_PERIMETRE = new Set(Array.isArray(pilotage.kpi_hors_perimetre)
+    ? pilotage.kpi_hors_perimetre : []);
   const trouves = {}, ignores = [], horsPeriode = [];
   // horsPeriodeDetail (18/08/2026) : {kid: periode_analysee}. `horsPeriode` (tableau de
   // libellés) reste inchangé pour les bancs existants ; ce détail-ci permet à l'interface de
@@ -2936,6 +3032,15 @@ function construireDash(kpiSummaries, historiques, period, client, historiqueMen
   // chez le client le 17/08/2026 : dépôt de juillet, sélecteur resté sur août (mois courant
   // par défaut) -> 3 indicateurs calculés déclarés « non déposés ».
   const horsPeriodeDetail = {};
+  /* La date de génération sert AUSSI de référence à l'âge de chaque KPI : elle est calculée ici,
+     avant la boucle, plutôt que deux fois à deux instants qui pourraient tomber de part et
+     d'autre de minuit.
+     `asOf` (7e paramètre, facultatif) porte le `--asof` de Python : une date de référence figée.
+     En production elle est toujours absente et l'on prend aujourd'hui — c'est le bon choix pour
+     une application interactive. Elle existe pour les bancs : sans elle, la fraîcheur dépend du
+     jour où l'on rejoue, et une vérité de référence devient incomparable le lendemain. */
+  const dash_genere_le = /^\d{4}-\d{2}-\d{2}$/.test(String(asOf||""))
+    ? String(asOf) : new Date().toISOString().slice(0,10);
   for(const [fn, s] of Object.entries(kpiSummaries||{})){
     if(!s) continue;
     const kidBrut = s.kpi_id;
@@ -2952,9 +3057,23 @@ function construireDash(kpiSummaries, historiques, period, client, historiqueMen
   for(const kid of WHITELIST){
     const s = trouves[kid];
     if(!s){ absents.push(kid); continue; }
+    /* `age` et `statut` — portés le 25/09/2026 (Python L329-331). L'application calculait déjà
+       la fraîcheur, mais ailleurs (rapportDisponibilite) et avec un autre vocabulaire
+       (« Frais »/« Périmé »). La synthèse, elle, ne la portait pas du tout : un KPI périmé y
+       était indiscernable d'un KPI du jour. Le vocabulaire est celui de Python — « frais » en
+       minuscules, « PÉRIMÉ » en capitales — parce que le cockpit compte les « PÉRIMÉ ». */
+    const ageJours = (function(){
+      const d = String(s.date_analyse||"").slice(0,10);
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
+      const ms = Date.parse(dash_genere_le+"T00:00:00Z") - Date.parse(d+"T00:00:00Z");
+      return isFinite(ms) ? Math.round(ms/86400000) : null;
+    })();
     const entry = {
       id: kid, titre: TITRES[kid], src: SRC[kid], fresh: FRESH[kid],
       date: s.date_analyse, periode: s.periode_analysee||"",
+      age: ageJours,
+      statut: (ageJours !== null && ageJours <= FRESH[kid]) ? "frais" : "PÉRIMÉ",
+      note_methodo: (s._note === undefined ? null : s._note),
       primary: buildPrimary(s), secondary: buildSecondary(s),
       ventil: buildVentil(kid, s, historiques),
       history: buildHistory(kid, s, historiques, historiqueMensuel),
@@ -2963,24 +3082,134 @@ function construireDash(kpiSummaries, historiques, period, client, historiqueMen
     ecartsCoherence(kid, s, historiques, entry, period);
     kpis.push(entry);
   }
-  const dash = { client: client||"Officine", genere_le: new Date().toISOString().slice(0,10), kpis };
+  const dash = { client: client||"Officine", genere_le: dash_genere_le, kpis };
+
+  /* ---- LE VERROU DE COUVERTURE — porté le 25/09/2026 (Python : verrou du 18/08/2026). ----
+     CE QU'IL EMPÊCHE. Le score est la MOYENNE des verdicts mesurés. Une mesure qui manque ne
+     baisse donc pas la note : elle sort du calcul. Sur les données réelles du client, retirer
+     quatre KPI sur sept fait MONTER le verdict de « orange » à « vert » — la donnée absente
+     améliore le résultat. Sous un certain taux de couverture, Python cesse de prononcer un
+     verdict : le score reste affiché, à titre indicatif, mais il ne conclut plus.
+
+     POURQUOI LE PORTAGE ÉVIDENT NE FERMAIT PAS. Un premier correctif posait le verrou sur le
+     simple nombre de KPI présents. Il ne se déclenchait sur AUCUN des deux cas pour lesquels le
+     verrou a été écrit, parce que Python ne compte pas les KPI PRÉSENTS : il compte les KPI
+     NOTÉS. Un indicateur neutralisé par son propre runner (`statut: "NON PUBLIABLE"`) ou dont la
+     valeur est impossible (un taux à 154,5 %) est présent, mais il n'est pas mesuré. Sans ces
+     deux drapeaux, la couverture est surévaluée et le verrou reste ouvert exactement quand il
+     devrait se fermer. On pose donc le pêne avant la serrure. */
+
+  // Un taux borné par construction dont la valeur sort de [-0,5 ; 100,5] n'est pas une
+  // contre-performance : c'est une mesure fausse. Défense posée par Python après l'incident du
+  // 17/08/2026, où un runner avait publié 154,5 %.
+  function estInvraisemblable(i){
+    if(!i || String(i.unite||"").trim() !== "%") return false;
+    // Accents retirés par normalize("NFD") : « évolution » et « evolution » doivent tomber sur
+    // la même règle. normNFKD() du pôle Achat n'est PAS visible depuis ce noyau partagé.
+    const nom = String(i.nom||"").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    if(/evolution|variation|progression|croissance/.test(nom)) return false;
+    let borne = false;
+    for(const s of [i.seuil_vert, i.seuil_rouge]){
+      const sn = seuilNum(s);
+      if(sn.val === null || sn.val === undefined) continue;
+      if(sn.val < 0 || sn.val > 100) return false;   // ce n'est pas un taux borné : on n'en juge pas
+      borne = true;
+    }
+    if(!borne) return false;
+    const v = num(i.valeur);
+    return v !== null && v !== undefined && (v < -0.5 || v > 100.5);
+  }
+  // Convention Kemet : un runner qui doute de sa propre mesure pose `statut: "NON PUBLIABLE"`
+  // et déplace les chiffres dans `_brut_non_publiable`. Sans lire ce champ, le KPI s'affiche
+  // « à jour » avec un tiret — indiscernable d'une donnée absente, alors que c'est une mesure
+  // INVALIDÉE. Le module des écarts de stock en pose une en production.
+  function motifNonPubliable(s){
+    if(!s || String(s.statut||"").toUpperCase().indexOf("NON PUBLIABLE") < 0) return null;
+    return String(s._note || "Mesure marquée non publiable par le skill source.");
+  }
+  /* Les trois listes d'escalade que Python publie à destination du cockpit. Sans elles, un KPI
+     neutralisé ou impossible disparaît du tableau de bord global : il n'est ni vert, ni rouge,
+     ni signalé. `fichiers_illisibles` reste en dette assumée — l'application n'a pas encore de
+     canal d'échec de lecture, et écrire une liste vide affirmerait qu'aucun fichier n'est
+     illisible alors qu'elle n'en sait rien. */
+  const anomalies = [], nonPubliables = [];
+  for(const k of kpis){
+    const src = trouves[k.id];
+    const mnp = motifNonPubliable(src);
+    if(mnp){
+      k.non_publiable = true; k.motif_non_publiable = mnp; k.statut = "NON PUBLIABLE";
+      k.note_methodo = null;                       // Python : entry["note_methodo"]=None
+      nonPubliables.push({kpi: k.titre, motif: mnp});
+    } else if(estInvraisemblable(src && (src.indicateurs||[])[0])){
+      k.invraisemblable = true; k.statut = "INVRAISEMBLABLE";
+      const i = (src.indicateurs||[])[0] || {};
+      anomalies.push(k.titre+" = "+i.valeur+" "+(i.unite||"")+
+                     " (borné à 100) — relancer le runner source");
+    }
+  }
+  const notesMeth = kpis.filter(k=>k.note_methodo).map(k=>({kpi:k.titre, note:k.note_methodo}));
+  const nbPerimes = kpis.filter(k=>k.statut === "PÉRIMÉ").length;
 
   // ---- synthèse machine-readable (contrat exact synthese_achat.json) ----
   const vsc = v => ({vert:3,orange:2,rouge:1}[v]);
-  const scores = kpis.map(k=>vsc(k.primary.verdict)).filter(x=>x!==undefined);
+  const notable = k => !k.invraisemblable && !k.non_publiable && !HORS_PERIMETRE.has(k.id);
+  const scores = kpis.filter(notable).map(k=>vsc(k.primary.verdict)).filter(x=>x!==undefined);
   const score = scores.length ? U.pyRound(scores.reduce((a,b)=>a+b,0)/scores.length, 1) : null;
-  const verdictGlobal = score===null ? null : (score>=2.5 ? "vert" : (score>=1.8 ? "orange" : "rouge"));
+  const registreActif = WHITELIST.filter(k=>!HORS_PERIMETRE.has(k));
+  const tauxCouverture = registreActif.length ? scores.length/registreActif.length : 0;
+  const suspendu = tauxCouverture < SEUIL_COUVERTURE;
+  /* CE TEXTE EST RECOPIÉ DE PYTHON SANS SES ACCENTS, ET C'EST VOULU.
+     build_dashboard_achat.py écrit « Verdict non prononce : … KPI mesures sur … » : les accents
+     y ont été perdus à l'écriture du script. Le motif est PUBLIÉ — il part dans la synthèse que
+     lit le cockpit. Le corriger ici ferait diverger l'application du document que le client
+     reçoit déjà, en silence, ce que ce projet s'interdit. On reproduit donc la faute et on
+     l'écrit ; la rectifier est une décision du Gérant, des deux côtés à la fois.
+     pyRound plutôt que Math.round : « %.0f » de Python arrondit au pair sur les demis. */
+  const pct = x => U.pyRound(x*100, 0);
+  const motifCouverture = suspendu
+    ? ("Verdict non prononce : "+scores.length+" KPI mesures sur "+registreActif.length+" ("+
+       pct(tauxCouverture)+" %), en dessous du seuil de "+pct(SEUIL_COUVERTURE)+
+       " % requis pour conclure. Le score reste indicatif.")
+    : null;
+  const verdictGlobal = (score===null || suspendu) ? null
+    : (score>=2.5 ? "vert" : (score>=1.8 ? "orange" : "rouge"));
   const synthese = {
     skill:"dashboard-achat", process:"achat", kpi_id:"dashboard_achat",
     date_analyse: dash.genere_le, client: dash.client, score_global: score, verdict_global: verdictGlobal,
-    nb_vert: kpis.filter(k=>k.primary.verdict==="vert").length,
-    nb_orange: kpis.filter(k=>k.primary.verdict==="orange").length,
-    nb_rouge: kpis.filter(k=>k.primary.verdict==="rouge").length,
+    couverture: { mesures: scores.length, registre: registreActif.length,
+                  taux: U.pyRound(tauxCouverture, 3), seuil: SEUIL_COUVERTURE,
+                  hors_perimetre: WHITELIST.filter(k=>HORS_PERIMETRE.has(k)).map(k=>TITRES[k]||k) },
+    verdict_suspendu: suspendu, motif_couverture: motifCouverture,
+    // Mêmes clés, même ordre que Python : la synthèse est lue par le cockpit de pilotage.
+    genere_a: new Date().toISOString().slice(0,19),
+    periode: period || null, periode_analysee: period || null,
+    nb_perimes: nbPerimes,
+    anomalies: anomalies, non_publiables: nonPubliables, notes_methodologiques: notesMeth,
+    nb_vert: kpis.filter(k=>notable(k) && k.primary.verdict==="vert").length,
+    nb_orange: kpis.filter(k=>notable(k) && k.primary.verdict==="orange").length,
+    nb_rouge: kpis.filter(k=>notable(k) && k.primary.verdict==="rouge").length,
     nb_absent: absents.length,
-    kpis: kpis.map(k=>({kpi_id:k.id, libelle:k.titre, verdict:k.primary.verdict,
-                         valeur:k.primary.valeur, unite:k.primary.unite, present:true}))
-      .concat(absents.map(a=>({kpi_id:a, libelle:TITRES[a]||a, verdict:null, present:false}))),
+    /* Les quatre champs ajoutés le 25/09/2026 — `statut`, `invraisemblable`, `non_publiable`,
+       `note` — étaient publiés par Python et absents de l'application. Ils sont écrits MÊME
+       QUAND ILS SONT FAUX : un drapeau omis et un drapeau à false se lisent pareil à l'œil, mais
+       pas pour un consommateur qui teste sa présence. Pour un KPI absent, Python distingue
+       « hors perimetre » (retiré par décision) de « absent » (pas déposé) — sans accents dans le
+       script, reproduit tel quel. */
+    kpis: kpis.map(k=>({kpi_id:k.id, libelle:k.titre,
+                         verdict:(k.invraisemblable||k.non_publiable) ? null : k.primary.verdict,
+                         valeur:k.primary.valeur, unite:k.primary.unite,
+                         statut:(k.statut === undefined ? null : k.statut),
+                         invraisemblable: !!k.invraisemblable,
+                         non_publiable: !!k.non_publiable,
+                         note:(k.note_methodo === undefined ? null : k.note_methodo),
+                         present:true}))
+      .concat(absents.map(a=>({kpi_id:a, libelle:TITRES[a]||a, verdict:null, present:false,
+                               hors_perimetre: HORS_PERIMETRE.has(a),
+                               statut: HORS_PERIMETRE.has(a) ? "hors perimetre" : "absent"}))),
   };
+  dash.couverture = synthese.couverture;
+  dash.verdict_suspendu = suspendu;
+  dash.motif_couverture = motifCouverture;
   return { dash, synthese, absents, ignores, horsPeriode, horsPeriodeDetail };
 }
 
@@ -3085,7 +3314,18 @@ function construireEcarts(kpiSummaries, period){
     }
   }
   acts.sort((a,b)=>a.rang-b.rang);
-  return { detail, planActions: acts, aucunHorsObjectif: detail.length===0 };
+  /* `aucunHorsObjectif` est vrai DANS DEUX SITUATIONS QUI N'ONT RIEN À VOIR : tous les
+     indicateurs mesurés sont au vert, ou bien AUCUN indicateur n'a été mesuré. Les appelants
+     n'avaient que ce booléen et écrivaient la même phrase dans les deux cas — le classeur des
+     écarts publiait « Tous les KPI achat de la période atteignent leur objectif. » sur un mois
+     où rien n'avait été déposé (reproduit le 18/09/2026 sur une officine neuve, période 2026-09).
+     C'est la faute du 17/09 transposée : une absence de mesure présentée comme une conformité.
+     On expose donc le COMPTE des indicateurs retenus. Le booléen ne change pas de sens — aucun
+     appelant existant n'est cassé — mais chacun peut désormais dire laquelle des deux situations
+     il a devant lui. Voir _tests/test_ecarts_periode_vide.js. */
+  const mesures = Object.keys(trouves).length;
+  return { detail, planActions: acts, aucunHorsObjectif: detail.length===0,
+           mesures: mesures, aucuneMesure: mesures===0 };
 }
 
 glob.KemetAgregation = {
@@ -3287,12 +3527,41 @@ function slugifie(s){ return U.normLibre(s||"officine").toLowerCase().replace(/[
 // d'IndexedDB — vider IndexedDB le perdait, rendant le code de récupération inutilisable faute
 // de savoir à quelle officine l'appliquer. Ce fichier devient sa trace hors ligne.
 const SECRETS_CLOUD_HORS_FICHIER = ["_cloud_local", "_cloud_version"];
+
+/* SECRETS EN PROFONDEUR — ajouté le 26/09/2026, avec le déchiffrement du journal bancaire.
+   Le Directeur Général a décidé ce jour-là que l'application ouvrirait elle-même le journal de
+   banque protégé. Son mot de passe vit donc dans la fiche, sous
+   `config.rapprochement_bancaire.journal_password`, là où le moteur Python le lit déjà.
+   OÙ IL VOYAGE, mesuré le 26/09/2026 : la fiche locale est chiffrée derrière le code à 5 chiffres,
+   le blob cloud derrière le code de récupération de 20 caractères — les deux sont corrects. Mais
+   LA SAUVEGARDE QUE LE GÉRANT TÉLÉCHARGE est un .json en clair, et `SECRETS_CLOUD_HORS_FICHIER`
+   ne retirait que les deux clés du cloud. Un mot de passe de banque serait parti avec, lisible
+   par quiconque ouvre le fichier.
+   Les clés cloud vivent à la racine de `config`, celle-ci vit dans une sous-rubrique : il faut
+   donc un second mécanisme, par CHEMIN, et non l'allonger d'une clé de plus. */
+const SECRETS_IMBRIQUES_HORS_FICHIER = [["rapprochement_bancaire", "journal_password"]];
+
 function officinePourExport(officine){
   const copie = JSON.parse(JSON.stringify(officine));
   if(copie && copie.config){
     SECRETS_CLOUD_HORS_FICHIER.forEach(k=>{ delete copie.config[k]; });
+    SECRETS_IMBRIQUES_HORS_FICHIER.forEach(chemin=>{
+      let n = copie.config;
+      for(let i = 0; i < chemin.length - 1; i++){
+        if(!n || typeof n !== "object") return;
+        n = n[chemin[i]];
+      }
+      if(n && typeof n === "object") delete n[chemin[chemin.length - 1]];
+    });
   }
   return copie;
+}
+
+/* Vrai si la fiche PORTE le mot de passe du journal — sans jamais le lire ni le rendre.
+   Sert uniquement à prévenir, à la restauration, qu'une sauvegarde ne le contient pas. */
+function fichePorteMotDePasseJournal(officine){
+  const rb = ((officine||{}).config||{}).rapprochement_bancaire;
+  return !!(rb && typeof rb === "object" && rb.journal_password);
 }
 
 function nomFichierSauvegarde(officine){
@@ -3716,7 +3985,8 @@ glob.KemetSauvegarde = {
   etatBandeau, texteBandeau, marquerAnalyseFaite, marquerSauvegarde,
   slugifie, nomFichierSauvegarde, nouvelIdentifiant, cleDe, adopterOfficine,
   compareVersions,
-  officinePourExport, SECRETS_CLOUD_HORS_FICHIER,
+  officinePourExport, SECRETS_CLOUD_HORS_FICHIER, SECRETS_IMBRIQUES_HORS_FICHIER,
+  fichePorteMotDePasseJournal,
   secoursEcrire, secoursLire, secoursLister, secoursListerDetail, secoursSupprimer,
   memoireDisponible, demanderPersistance, persistanceAccordee,
   chiffrementDisponible, preparerVerrou, ouvrirVerrou,
@@ -4177,6 +4447,36 @@ const GROUPES_TRESORERIE = [
       piege:"Facultatif, MAIS s'il est déposé sans que la fiche de l'officine dise QUI est le "+
             "bénéficiaire attendu, rien n'est publié. Renseigner « Les injections Wave » "+
             "dans la fiche — ou une liste vide si l'officine n'a réellement aucune injection." },
+    /* T11 et T12 AJOUTÉS LE 17/09/2026, à la demande du DG. Ces deux pièces n'étaient dans
+       AUCUN catalogue, alors que deux objectifs de prime en dépendent : l'écart de coffre
+       (40 000 F) et le taux de rapprochement bancaire (15 000 F). En août 2026, le journal de
+       banque déposé s'arrêtait au 5 du mois et personne ne l'a vu avant l'heure des primes.
+       Une pièce absente du catalogue est une pièce qu'on oublie sans le savoir. */
+    { ref:"T11", src:"officine", sansModule:true,
+      t:"Le fichier de suivi du coffre, comptage du 1er du mois renseigné",
+      ou:"tenu par l'officine (« suivi coffre.xlsx »)",
+      piege:"LE ZÉRO DE CE FICHIER SE FABRIQUE TOUT SEUL. La colonne « théorique » est la "+
+            "formule = comptage du MOIS PRÉCÉDENT : tant que la case « compté » du mois n'est "+
+            "pas mise à jour, l'écart affiche 0 et l'objectif paraît atteint sans qu'aucun "+
+            "comptage n'ait eu lieu. Vérifier que la ligne du mois porte un comptage RÉEL avant "+
+            "de déposer — un 0,00 % non compté vaut mieux déclaré non mesuré." },
+    { ref:"T12", src:"officine", sansModule:true,
+      t:"Le journal de banque des cinq comptes, tenu jusqu'au {finM}",
+      ou:"tenu par l'officine (« Banque 2026.xlsx »)",
+      piege:"DEUX PIÈGES. (1) Le taux mesure la TENUE DU JOURNAL, pas le pointage : un journal "+
+            "arrêté au 5 du mois donne un taux effondré qui n'accuse pas le rapprochement mais "+
+            "le journal lui-même — c'est ce qui s'est produit en août 2026 (17 écritures pour "+
+            "163 lignes de relevé côté SIB). (2) Le fichier est CHIFFRÉ : son mot de passe vit "+
+            "dans la fiche de l'officine, jamais dans le code ni dans un message. Sans lui, "+
+            "rien n'est lisible et l'indicateur reste non mesuré." },
+    { ref:"T13", src:"tiers", sansModule:true,
+      t:"Les relevés bancaires du mois, UN PAR COMPTE UTILISÉ",
+      ou:"espaces en ligne des banques de l'officine",
+      piege:"UN RELEVÉ QUI MANQUE NE SE VOIT QU'AU CALCUL, c'est-à-dire trop tard. En août "+
+            "2026, deux relevés absents ont fait tomber le taux de rapprochement à 13,9 % : "+
+            "une fois déposés, il était de 94,5 %. Déposer un relevé par compte RÉELLEMENT "+
+            "UTILISÉ dans le mois — un compte sans mouvement ni écriture au journal ne "+
+            "pénalise pas, un compte utilisé dont le relevé manque, si." },
     { ref:"T9", src:"cabinet", option:true,
       t:"justifications_versements.json — les écarts justifiés par le titulaire",
       ou:"produit par le cabinet, validé par le titulaire",
@@ -4988,9 +5288,52 @@ function calculerModeC(ouverts, cfg, log, journal){
     stock.push({code:code, stock:stkVal, prmp:prmpVal, val:val, lib:lib, lab:normJoin(lib)});
   }
 
-  // ---- Table code -> sous-emplacement, repli v5 UNIQUEMENT (rapport Mode C §1, cf bandeau) ----
+  // ---- Table code -> sous-emplacement ----
+  // VARIANTE « LISTING DES PRODUITS ... FOURNISSEUR » — PORTÉE LE 16/09/2026.
+  // Elle était annoncée non portée « faute de détail sur son parsing ». Le détail existe :
+  // delai_mode_c.py:194-226. Les blocs « FOURNISSEUR : X » portent en réalité le
+  // SOUS-EMPLACEMENT — défaut d'étiquette de Médiciel, documenté en tête du script Python.
+  // POURQUOI ÇA COMPTAIT : les deux tables de rayons réelles du client (juillet et août 2026)
+  // sont dans CETTE variante, jamais dans celle du repli v5. Sans elle, la ventilation
+  // officine/para, la feuille « Par rayon » et le taux de stock mort étaient tous indisponibles
+  // sur les données réelles — constaté le 16/09/2026 en instruisant un écart de 975 739 F qui
+  // s'est avéré venir d'une vérité de banc régénérée avec un autre jeu de fichiers.
+  // Python essaie cette variante D'ABORD, le repli v5 ensuite : même ordre ici.
   let mapping = {}, mappingFile=null;
+  function lireListingFournisseur(o){
+    const platCells = [];
+    for(let i=0;i<Math.min(8,o.rows.length);i++){
+      for(const c of (o.rows[i]||[])){
+        if(c!==null && c!==undefined && c!=="") platCells.push(sa(c));
+      }
+    }
+    const plat = platCells.join(" | ");
+    if(plat.indexOf("LISTING DES PRODUITS")<0 || plat.indexOf("FOURNISSEUR")<0) return null;
+    let cur = null;
+    const mp = {};
+    for(const r of o.rows){
+      const cells = (r||[]).filter(c=>c!==null && c!==undefined && c!=="").map(c=>U.S(c));
+      // Une ligne de deux cellules utiles ou moins portant « FOURNISSEUR : X » ouvre une section.
+      if(cells.length <= 2){
+        const m = /FOURNISSEUR\s*:\s*(.+)/.exec(sa(cells.join(" ")));
+        if(m){ cur = U.strip(m[1]); continue; }
+      }
+      if(r[0]===null || r[0]===undefined || cur===null) continue;
+      const code = U.C(r[0]);
+      if(!code) continue;
+      const cu = sa(code);
+      if(cu.indexOf("CODE PRODUIT")===0 || cu.indexOf("TOTAUX")===0 || cu.indexOf("EDITE")===0) continue;
+      mp[code] = cur;
+    }
+    return Object.keys(mp).length ? mp : null;
+  }
   for(const o of ouverts){
+    if(o===stockFile || o===tcdFile) continue;
+    const mp = lireListingFournisseur(o);
+    if(mp){ mapping = mp; mappingFile = o; break; }
+  }
+  // ---- Repli v5 : export complet du stock portant CODE 1 + SOUS-EMPLACEMENT ----
+  if(!mappingFile) for(const o of ouverts){
     if(o===stockFile || o===tcdFile) continue;
     const hi = L.trouverLigneEntete(o.rows, ["CODE 1","SOUS-EMPLACEMENT"], 20);
     if(hi<0) continue;
@@ -5006,10 +5349,9 @@ function calculerModeC(ouverts, cfg, log, journal){
     mappingFile = o; break;
   }
   if(!mappingFile){
-    log("warn","Mode C : aucune table de correspondance code -> sous-emplacement (colonnes "+
-      "CODE 1 + SOUS-EMPLACEMENT) trouvée : la ventilation officine/para sera indisponible. "+
-      "(La variante historique « LISTING DES PRODUITS...FOURNISSEUR » n'est pas portée dans ce "+
-      "module faute de détail sur son parsing — limitation documentée, cf bandeau du module.)");
+    log("warn","Mode C : aucune table de correspondance code -> sous-emplacement trouvée, "+
+      "ni dans la variante « LISTING DES PRODUITS...FOURNISSEUR », ni dans le repli "+
+      "CODE 1 + SOUS-EMPLACEMENT : la ventilation officine/para sera indisponible.");
   } else {
     log("ok", mappingFile.nom+" — table de correspondance code -> sous-emplacement reconnue.");
   }
@@ -5088,6 +5430,17 @@ function calculerModeC(ouverts, cfg, log, journal){
     parRayonC.push({ pole:pole, sous_emplacement:se, nb_ref:items.length, stock_prmp:U.pyRound(sv,0),
       delai: d!==null?U.pyRound(d,1):null });
   });
+  // ORDRE DES EX AEQUO (corrigé le 17/09/2026). Python parcourt `sorted(par_se.items())` —
+  // donc les sous-emplacements dans l'ordre ALPHABÉTIQUE — puis applique `rayons.sort` par
+  // délai décroissant, qui est STABLE : à délai égal, l'ordre alphabétique subsiste. Le module
+  // partait de l'ordre de rencontre dans le fichier de stock : mêmes lignes, même total, mais
+  // 49 cellules déplacées dans la feuille « Par rayon » du classeur d'août.
+  // Comparaison brute (< / >) et non localeCompare : c'est l'ordre des points de code que
+  // Python applique, pas l'ordre alphabétique du français.
+  parRayonC.sort(function(a,b){
+    const sa = String(a.sous_emplacement||""), sb = String(b.sous_emplacement||"");
+    return sa < sb ? -1 : (sa > sb ? 1 : 0);
+  });
   parRayonC.sort((a,b)=>(b.delai||0)-(a.delai||0));
 
   const totalParSe = new Map();
@@ -5117,23 +5470,83 @@ function calculerModeC(ouverts, cfg, log, journal){
     const codes3m = parseNonVendus3m(f2c.rows);
     const items3m = stock.filter(p=>codes3m.has(p.code));
     const v3 = items3m.reduce((s,p)=>s+p.val,0);
+    /* VENTILATION PAR PÔLE — AJOUTÉE LE 17/09/2026, sur règle rappelée par le DG.
+       Aucun des deux scripts Python ne la produit, et c'est précisément ce qui manquait : la
+       décision qualité du 23/07/2026 pilote le stock mort OFFICINE, alors que ce listing-ci est
+       tous pôles. Faute de cette ventilation, l'indicateur de prime était lu tantôt sur cette
+       définition tous pôles, tantôt sur les dormants « aucune vente sur l'année » ventilés,
+       tantôt sur un chiffre de cockpit — trois nombres pour un seul objectif.
+       Les deux morceaux existaient déjà : la liste des codes du listing et la table de
+       correspondance rayon -> pôle. On les croise, rien de plus.
+       INCONNU RESTE INCONNU : une référence hors table de correspondance n'est PAS de l'officine.
+       La compter avec elle gonflerait l'indicateur d'un montant qu'on ne sait pas attribuer. */
+    const pole3m = { OFFICINE:{valeur:0, nb_ref:0}, PARA:{valeur:0, nb_ref:0},
+                     INCONNU:{valeur:0, nb_ref:0} };
+    items3m.forEach(function(p){
+      const se = cleRayon(p);
+      const k = (se === "(hors table de mapping)") ? "INCONNU" : (estPara(se) ? "PARA" : "OFFICINE");
+      pole3m[k].valeur += p.val; pole3m[k].nb_ref++;
+    });
+    const totOff3m = stock.reduce(function(a,p){
+      const se = cleRayon(p);
+      return a + ((se !== "(hors table de mapping)" && !estPara(se)) ? p.val : 0); }, 0);
+    ["OFFICINE","PARA","INCONNU"].forEach(function(k){
+      pole3m[k].valeur = U.pyRound(pole3m[k].valeur, 0);
+    });
+    pole3m.OFFICINE.total_pole = U.pyRound(totOff3m, 0);
+    pole3m.OFFICINE.taux_pct = totOff3m ? U.pyRound(100*pole3m.OFFICINE.valeur/totOff3m, 1) : null;
+
     stockMort3m = {
       valeur:U.pyRound(v3,0), nb_ref:items3m.length,
       taux_pct: totStock ? U.pyRound(100*v3/totStock,1) : null,
       definition:"ni achete ni vendu sur 3 mois glissants (listing Mediciel) — serie comparable au mode A",
       source: f2c.nom,
-      // Pas de sous-clé par_pole : rapport Mode C §8, confirmé absent des deux scripts Python.
+      par_pole: pole3m,
     };
     log("ok", f2c.nom+" — listing des non-vendus (3 mois glissants) reconnu pour stock_mort_3m.");
   }
 
+  /* ---- points forts / faibles et actions — delai_mode_c.py:488-501, PORTÉS LITTÉRALEMENT ----
+     CORRIGÉ LE 17/09/2026. Le module écrivait ici les textes du MODE A : « Délai d'écoulement
+     global dans la cible (19-30 jours). » et une phrase « Rayons en sur-stock : … » que le
+     Mode C n'émet JAMAIS. Trouvé en portant la note : la note remise au client dit « Rotation
+     globale 22.2 j dans la norme 19-30 j. » et « Stock mort 19.0 % — 634 références, 8091379
+     FCFA immobilisés. », deux phrases que l'application ne produisait pas.
+     Les nombres sont écrits À LA PYTHON (« 22.2 », point décimal) : c'est la note qui les
+     francise à l'écriture, comme le fait _fr() dans note_kemet.py. Les franciser ici
+     produirait « 22,2 » dans le kpi_summary, donc une fiche différente de celle de Python. */
   const pointsFaibles = [];
-  const surStockC = parRayonC.filter(r=>r.delai!==null && r.delai>45).slice(0,5);
-  if(surStockC.length) pointsFaibles.push("Rayons en sur-stock : "+
-    surStockC.map(r=>(r.sous_emplacement||"?")+" "+r.delai+"j").join(", ")+".");
   const pointsForts = [];
   // verdictDelaiC(dG) sur la valeur BRUTE (pas dgVal arrondi) — cf relecture adversariale #1/#5.
-  if(verdictDelaiC(dG)==="vert") pointsForts.push("Délai d'écoulement global dans la cible (19-30 jours).");
+  if(dG !== null && dG !== undefined){
+    if(verdictDelaiC(dG) === "vert"){
+      pointsForts.push("Rotation globale " + dG.toFixed(1) + " j dans la norme 19-30 j.");
+    } else {
+      pointsFaibles.push("Rotation globale " + dG.toFixed(1) + " j hors de la norme 19-30 j.");
+    }
+  }
+  const actionsC = [];
+  if(tauxMortC !== null && tauxMortC !== undefined && tauxMortC >= 10){
+    pointsFaibles.push("Stock mort " + tauxMortC.toFixed(1) + " % — " + dormants.length +
+      " références, " + U.pyRound(valDorm, 0) + " FCFA immobilisés.");
+    actionsC.push({ action:"Trier les références sans aucune vente sur l'année : retour "+
+      "grossiste, déstockage, don proche péremption.",
+      responsable:"Achats / approvisionnement (terrain)", priorite:"moyenne" });
+  }
+
+  // Calculés ici plutôt que plus bas : la charge du livrable en a besoin dès la construction
+  // de kpiSummary. Même définition que l'indicateur « Stock mort officine (FCFA) » publié
+  // ensuite — une seule source, pas deux calculs qui pourraient diverger.
+  const vOffMortC = U.pyRound(stockMortParRayon.reduce(function(a,r){
+    return a + (r.pole==="OFFICINE" ? (r.valeur||0) : 0); }, 0), 0);
+  const poleConnuC = stockMortParRayon.some(function(r){ return r.pole!==null; });
+
+  // delai_mode_c.py:498-501 : sans ventilation publiable, on demande le listing qui la rétablit.
+  if(ventilation === null){
+    actionsC.push({ action:"Ressortir de Médiciel le listing des produits par sous-emplacement "+
+      "pour rétablir la ventilation officine/para.",
+      responsable:"Achats / approvisionnement (terrain)", priorite:"haute" });
+  }
 
   const kpiSummary = {
     skill:"delai-ecoulement", kpi_id:"delai_ecoulement", mode:"C", // présent ici (asymétrie vs Mode A, cf bandeau)
@@ -5155,15 +5568,21 @@ function calculerModeC(ouverts, cfg, log, journal){
               formule:"somme(stock x PRMP) / somme(VM x PRMP / 30)",
               nb_ref_actives: actifs.length, nb_ref_stock: stock.length,
               stock_dormant_fcfa: U.pyRound(valDorm,0), couverture_mapping_pct: couverture },
+    // DÉTAIL DES DORMANTS — nécessaire au classeur Delai_Ecoulement_*.xlsx (feuille
+    // « Stock dormant »), que l'application doit produire elle-même. Préfixé par un blanc
+    // souligné : ce n'est PAS une extension du contrat kpi_summary publié au cabinet, c'est
+    // une charge de livrable, filtrée à l'export comme les autres clés techniques.
     avertissement: avertissement,
     points_forts: pointsForts,
     points_faibles: pointsFaibles.length?pointsFaibles:["Aucun rayon en sur-stock détecté (>45 jours)."],
-    actions_recommandees: dormants.length ? [{action:"Trier les "+dormants.length+" référence(s) dormante(s) (absentes du TCD ou sans vente sur l'année).",
-      responsable:"Achats / approvisionnement (terrain)", priorite:"moyenne"}] : [],
-    _note:"MODE C — la colonne VM de Médiciel n'étant plus exportable pour cette période, la VM "+
-      "est reconstruite depuis le TCD des ventes (moyenne du mois M et du mois M-1). Formule "+
-      "identique au Mode A, séries comparables. Un produit en stock absent du TCD sur l'année (ou "+
-      "sans vente sur l'année) est classé en stock dormant.",
+    actions_recommandees: actionsC,
+    // TEXTE DE RÉSERVE — delai_mode_c.py:483-486, repris MOT POUR MOT (corrigé le 17/09/2026).
+    // L'application en avait une reformulation plus détaillée ; elle disait la même chose, mais
+    // la note remise au client porte celle-ci, et c'est elle qui fait foi.
+    _note:"MODE C — la colonne VM de Médiciel n'étant plus exportable, la vitesse de vente est "+
+      "reconstruite depuis le TCD des ventes par produit. Formule identique au MODE A : "+
+      "les séries se comparent. Un produit en stock absent du TCD de l'année n'a vendu "+
+      "aucune unité et compte comme dormant.",
   };
 
   // MONTANT PUBLIÉ (19/08/2026) — rapport commenté, chantier 13.1. CE N'EST PAS UN ÉCART AU
@@ -5175,7 +5594,7 @@ function calculerModeC(ouverts, cfg, log, journal){
   // Le Mode A ne le publie PAS, délibérément : le Python ne l'y ajoute pas, et l'historique
   // apparie les indicateurs par NOM EXACT (kpi_history.fill) — publier ce même nom depuis deux
   // modes aux définitions différentes fabriquerait une pente entre deux mesures non comparables.
-  const vOffMort = U.pyRound(stockMortParRayon.reduce((a,r)=>a+(r.pole==="OFFICINE"?(r.valeur||0):0),0),0);
+  const vOffMort = vOffMortC; // calculé plus haut, source unique (cf _detail_stock_mort_officine)
   // GARDE-FOU (corrigé le 19/08/2026, défaut trouvé par _tests/test_stock_mort_evolution.js).
   // Python protège cet ajout par `if mort_rayon:`, et `mort_rayon` n'est construit QUE sous
   // `if mp:` — c'est-à-dire seulement quand la table de correspondance pôle a été trouvée.
@@ -5185,7 +5604,7 @@ function calculerModeC(ouverts, cfg, log, journal){
   // l'officine » alors que la vérité est « on ne sait pas séparer officine et para ». C'est
   // exactement le zéro trompeur que ce chantier s'interdit. L'équivalent fidèle ET honnête est
   // donc : ne publier que si au moins un sous-emplacement a réellement été classé.
-  const poleConnu = stockMortParRayon.some(r=>r.pole!==null);
+  const poleConnu = poleConnuC; // idem
   if(stockMortParRayon.length && poleConnu){
     const indMort = {nom:"Stock mort officine (FCFA)", valeur:vOffMort, unite:"FCFA",
       verdict:null, seuil_vert:"évolution <= -300 000 F/mois (décision SMQ 23/07/2026)",
@@ -5233,7 +5652,73 @@ function calculerModeC(ouverts, cfg, log, journal){
   log("ok", "Délai d'écoulement Mode C calculé — global "+(dgVal===null?"n/a":dgVal+"j")+
     ", officine "+(doVal===null?"n/a":doVal+"j")+", para hors laits/farines "+
     (dpVal===null?"n/a":dpVal+"j")+".");
-  return { kpiSummary:kpiSummary, journal:journal, mode:"C" };
+  /* ---- fullData — clé sœur du résultat, même convention que les autres modules -------------
+     Ce que les LIVRABLES exigent et que le kpi_summary ne porte pas : le détail ligne à ligne des
+     quatre feuilles du classeur Delai_Ecoulement_*.xlsx. Il n'a RIEN à faire dans le kpi_summary,
+     qui est le contrat publié au cabinet : 634 dormants et 30 rotations lentes y alourdiraient
+     chaque fiche et chaque export, et le banc de parité avec Python refuserait l'extension.
+     C'est `charge(fullData)` qui en extrait ce qui sera rangé dans livrables_mensuel. ---------- */
+  // Classement complet des références actives par délai décroissant, calculé UNE fois : il
+  // sert au top 30 global (celui du classeur d'origine) et aux tops 30 par département.
+  const lentsTries = actifs.slice()
+    .sort(function(a,b){ return (b.stock/(b.vm/30.0)) - (a.stock/(a.vm/30.0)); })
+    .map(function(p){
+      return { code:p.code, lab:p.lab, stock:p.stock, vm:p.vm,
+               delai:p.stock/(p.vm/30.0), val:p.val,
+               se:p.se || null, pole: p.se ? (estPara(p.se) ? "PARA" : "OFFICINE") : null };
+    });
+
+  const fullData = {
+    mode: "C",
+    periode: formatPeriodeFR(periodeC),
+    sources: kpiSummary.sources,
+    delai_global: dgVal, delai_officine: doVal, delai_para_hors_laits: dpVal,
+    nb_ref_actives: actifs.length, nb_ref_stock: stock.length,
+    stock_dormant_nb: dormants.length,
+    stock_dormant_fcfa: U.pyRound(valDorm,0),
+    taux_stock_mort: tauxMortC,
+    couverture_mapping_pct: couverture,
+    par_rayon: parRayonC,
+    // Libellé NORMALISÉ (`lab`) : c'est celui qu'écrit delai_mode_c.py dans le classeur.
+    // `lib` reste à côté pour un affichage à l'écran, où la casse d'origine se lit mieux.
+    // `se` et `pole` sur CHAQUE ligne : l'officine et la para sont deux départements distincts,
+    // et une liste mélangée n'est actionnable par personne (demande du DG, 17/09/2026). `pole`
+    // vaut null — et non "OFFICINE" — quand le sous-emplacement n'est pas rattaché : inconnu
+    // n'est pas officine.
+    dormants: dormants.map(function(p){
+      return { code:p.code, lab:p.lab, lib:p.lib, stock:p.stock, prmp:p.prmp, val:p.val,
+               se:p.se || null, pole: p.se ? (estPara(p.se) ? "PARA" : "OFFICINE") : null };
+    }),
+    // Top 30 des rotations lentes — delai_mode_c.py:435-438 : tri sur stk/(vm/30) décroissant,
+    // 30 premiers. Délai laissé BRUT, l'arrondi se fait à l'écriture, comme Python. Tri stable
+    // des deux côtés, donc les ex aequo gardent l'ordre de `actifs`.
+    lents: lentsTries.slice(0, 30),
+    // UN TOP 30 PAR DÉPARTEMENT (demande du DG, 17/09/2026). Officine et para sont deux
+    // départements distincts : un top 30 mélangé laisserait la para avec trois lignes, donc
+    // sans liste de travail. On NE filtre PAS le top 30 global — on reprend le classement
+    // complet et on prend les 30 premiers DE CHAQUE pôle.
+    lents_officine: lentsTries.filter(function(p){ return p.pole === "OFFICINE"; }).slice(0, 30),
+    lents_para: lentsTries.filter(function(p){ return p.pole === "PARA"; }).slice(0, 30),
+    // Ni officine ni para : sous-emplacement non rattaché. Jamais rangé d'office dans l'un des
+    // deux — inconnu n'est pas officine.
+    lents_non_ventile: lentsTries.filter(function(p){ return p.pole === null; }).slice(0, 30),
+    // Stock mort OFFICINE — demande du DG (17/09/2026) : les classeurs de mai et juin le
+    // publiaient, la Synthèse du Mode C l'avait perdu. Le MODE est porté dans la structure :
+    // en Mode A un dormant vient du listing des non-vendus, en Mode C de l'absence du TCD sur
+    // l'année — les deux taux ne se comparent pas, et le classeur doit le dire.
+    stock_mort_officine: (function(){
+      var totOff = 0;
+      for(var i=0;i<stock.length;i++){
+        var q = stock[i];
+        if(q.se && !estPara(q.se)) totOff += q.val;
+      }
+      if(!poleConnuC || !totOff) return null;
+      return { valeur: U.pyRound(vOffMortC,0), total_officine: U.pyRound(totOff,0),
+               taux_pct: U.pyRound(vOffMortC/totOff*100,1), mode:"C" };
+    })(),
+  };
+
+  return { kpiSummary:kpiSummary, fullData:fullData, journal:journal, mode:"C" };
 }
 
 /* ---------- adaptateur : inscription au registre des modules KPI ---------- */
@@ -5282,7 +5767,7 @@ async function calculer(fichiers, config, equivalences){
         const cl = await L.lireClasseur(f.buffer);
         ouverts.push({nom:f.nom, rows:cl.rows});
       }catch(e){
-        log("warn", f.nom+" — illisible, ignoré pour le délai d'écoulement ("+String((e&&e.message)||e).slice(0,80)+").");
+        log("warn", f.nom+" — illisible, ignoré pour le délai d'écoulement ("+L.messagePourJournal(e,80)+").");
       }
     }
     if(!ouverts.length){
@@ -6036,7 +6521,7 @@ async function calculer(fichiers, config, equivalences){
         const cl = await L.lireClasseur(f.buffer);
         ouverts.push({nom:f.nom, cl:cl, rows:cl.rows});
       }catch(e){
-        log("warn", f.nom+" — illisible, ignoré pour les périmés ("+String((e&&e.message)||e).slice(0,80)+").");
+        log("warn", f.nom+" — illisible, ignoré pour les périmés ("+L.messagePourJournal(e,80)+").");
       }
     }
     if(!ouverts.length){
@@ -6762,7 +7247,7 @@ async function calculer(fichiers, config){
         const cl = await L.lireClasseur(f.buffer);
         lus.push({ nom:f.nom, rows: feuilleCA(cl) });
       }catch(e){
-        log("warn", f.nom+" — illisible, ignoré ("+String((e&&e.message)||e).slice(0,70)+").");
+        log("warn", f.nom+" — illisible, ignoré ("+L.messagePourJournal(e,70)+").");
       }
     }
 
@@ -7079,7 +7564,7 @@ async function calculer(fichiers, config){
         const rows = feuille(cl);
         if(estEtatStock(rows)){ src = { nom:f.nom, rows:rows }; break; }
       }catch(e){
-        log("warn", f.nom+" — illisible, ignoré ("+String((e&&e.message)||e).slice(0,70)+").");
+        log("warn", f.nom+" — illisible, ignoré ("+L.messagePourJournal(e,70)+").");
       }
     }
     if(!src){
@@ -7756,7 +8241,12 @@ function telechargerSauvegarde(){
   if(!etat.officine){ message("Ouvrir une officine d'abord."); return; }
   const nom = SV.nomFichierSauvegarde(etat.officine);
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(etat.officine, null, 2)],
+  // JAMAIS etat.officine directement : ni les clés cloud, ni le mot de passe du journal
+  // de banque ne sortent de cet appareil en clair. CORRIGÉ LE 28/09/2026 — ce pôle
+  // sérialisait la fiche brute depuis toujours, alors que officinePourExport() y était
+  // définie et exportée. La protection écrite le 15/09 n'était appelée que dans l'Achat,
+  // et la fiche est commune aux pôles : ce bouton-ci la publiait en clair.
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(SV.officinePourExport(etat.officine), null, 2)],
                                         {type:"application/json;charset=utf-8"}));
   a.download = nom;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
