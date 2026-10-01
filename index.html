@@ -34,13 +34,14 @@ Aucun serveur, aucune base, aucune bibliotheque distante : tout est lu dans ce
 navigateur, et le programme lui-meme est dans ce fichier.
 
 Blocs partages avec l'application officine, copies tels quels a la construction :
-     noyau-util         SHA-1 aa1712ffeb22
+     noyau-util         SHA-1 e5b2667135cc
      noyau-lecture      SHA-1 e0fe1671960a
      noyau-equivalences SHA-1 e4781ef666cd
      noyau-agregation   SHA-1 bf1537e1a8bd
      noyau-sauvegarde   SHA-1 40090dd31459
      noyau-cloud        SHA-1 6173c554ca5d
-     guide-collecte     SHA-1 7b83fce7b978
+     noyau-livrables    SHA-1 fda508d4dd56
+     guide-collecte     SHA-1 59985ccd9186
      lexique-note       SHA-1 fafe3bc584c3
      modules-registre   SHA-1 7bad12a353a3
      lib-xlsx           SHA-1 7f749f81a45a
@@ -572,6 +573,11 @@ a:focus-visible, .kp-link:focus-visible { outline: 2px solid var(--accent); outl
 .kp-verrou__touche:active { transform: translateY(1px); }
 .kp-verrou__touche--action { font-size: var(--fs-small); font-weight: 600; }
 .kp-verrou__erreur { font-size: var(--fs-small); color: var(--st-urgent-ink); min-height: 1.2em; }
+
+/* ---- La liste à emporter sur le poste de Médiciel (01/10/2026) ---- */
+.gc-collecte { margin: var(--sp-3) 0; padding: var(--sp-3) var(--sp-4);
+  border: 1px dashed var(--border-strong); border-radius: var(--r-2); background: var(--surface-1); }
+.gc-collecte .kp-toolbar { margin: var(--sp-2) 0; }
 
 /* ---- Synchro cloud (4/09/2026) : code de récupération et indicateur du bandeau ---- */
 .kp-cloud__boite { width: min(480px, 100%); }
@@ -2054,7 +2060,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 // rapports remis au client. Avec vingt abonnés sur des versions différentes, « quelle
 // version a mon client ? » doit avoir une réponse. Le banc test_version.js refuse la
 // publication si une source a été modifiée APRÈS cette date.
-const APP_VERSION = "1.4.5";
+const APP_VERSION = "1.4.6";
 const APP_DATE = "2026-10-01";
 
 /* ---------- primitives façon Python (portées de conformite-bl-app.html) ---------- */
@@ -5493,6 +5499,396 @@ glob.KemetCloud = { activerSynchro, pousserVersCloud, tirerDuCloud, relierNouvel
                     synchroniserAvecFusion, creerPiloteSynchro, API_BASE };
 })(window);
 </script>
+<script id="noyau-livrables">
+/* =============================================================================
+   NOYAU LIVRABLES — fabrique des documents Word (.docx) dans le navigateur
+   -----------------------------------------------------------------------------
+   POURQUOI CE BLOC EXISTE (16/09/2026). La chaîne Python écrit 62 fichiers par
+   mois, dont 15 Word. L'application n'en produisait AUCUN : `docx` n'apparaissait
+   nulle part dans les quatre binaires. Tant que ces documents ne sortent que de
+   Python, il faut lancer Python — donc subir ses dérives. C'est ce bloc qui rend
+   l'autonomie possible, et il sert les quatre pôles.
+
+   COMMENT. Un .docx est un ZIP de fichiers XML. JSZip est DÉJÀ embarqué dans
+   l'application (depuis le 21/08/2026, avec SheetJS et pdf.js) : aucune
+   dépendance nouvelle, aucun appel réseau. On écrit l'OOXML directement.
+
+   POURQUOI PAS SheetJS POUR LE WORD, NI SON STYLE POUR L'EXCEL. SheetJS écrit
+   des classeurs mais son édition communautaire n'écrit PAS les styles de
+   cellule : les en-têtes verts et les cellules colorées par verdict seraient
+   perdus. L'OOXML brut est le seul chemin qui tienne « à l'identique ».
+
+   CE QUE « À L'IDENTIQUE » VEUT DIRE ICI, ET CE QU'IL NE VEUT PAS DIRE.
+   Le document remis au client est produit par python-docx, qui embarque son
+   gabarit par défaut : un styles.xml de 349 Ko, un thème, une table de polices,
+   une vignette. Reproduire ces octets n'aurait aucun sens et n'apporterait rien.
+   La cible est le RENDU : mêmes polices, mêmes corps, mêmes couleurs, mêmes
+   filets, mêmes ombrages, même en-tête et même pied de page. C'est cela qui est
+   vérifié, document contre document.
+
+   PIÈGE HÉRITÉ, SIGNALÉ ET REPRODUIT : le gabarit par défaut de python-docx est
+   au format LETTER (12240 × 15840 twips), pas A4. Les notes déjà remises au
+   client sont donc en Letter. On reproduit ce format par fidélité ; `format:"A4"`
+   permet d'en sortir le jour où le DG le décide.
+   ============================================================================= */
+(function(glob){
+"use strict";
+
+// Un centimètre vaut 566,93 twips ; un point, 20 twips ; un demi-point, 10.
+// L'OOXML exprime les corps de police en DEMI-points (w:sz val="22" = 11 pt).
+const TWIPS_CM = 566.93;
+const cm = n => Math.round(n * TWIPS_CM);
+const demiPt = n => Math.round(n * 2);
+
+// Échappement XML. `&` EN PREMIER, sans quoi on ré-échapperait les esperluettes des entités
+// qu'on vient d'écrire — faute classique et silencieuse.
+// DEUX fonctions, pas une : dans un NŒUD DE TEXTE seuls & < > doivent être échappés.
+// Échapper aussi l'apostrophe en `&apos;` reste valide et Word l'affiche correctement, mais
+// python-docx ne le fait pas : la comparaison document contre document faisait alors apparaître
+// un écart sur chaque « L'essentiel ». Un écart de forme qui masque les vrais écarts est un
+// écart de trop.
+function xml(v){   // valeurs d'ATTRIBUT (toujours délimitées par des guillemets doubles ici)
+  return String(v === null || v === undefined ? "" : v)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+function xmlTexte(v){   // contenu TEXTUEL
+  return String(v === null || v === undefined ? "" : v)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+// Un texte Word perd ses espaces de début et de fin si on ne le dit pas.
+// `xml:space="preserve"` est indispensable : plusieurs passages de la note
+// s'assemblent en plusieurs runs et cassent sans lui (« conforme à 99,0% sur »).
+function t(texte){ return '<w:t xml:space="preserve">' + xmlTexte(texte) + '</w:t>'; }
+
+// Un « run » = un morceau de texte avec sa mise en forme.
+//   {t, gras, italique, couleur:"03341C", taille:11, police:"Calibri"}
+function run(r){
+  const p = [];
+  if(r.police) p.push('<w:rFonts w:ascii="'+xml(r.police)+'" w:hAnsi="'+xml(r.police)+'"/>');
+  if(r.gras) p.push("<w:b/>");
+  if(r.italique) p.push("<w:i/>");
+  if(r.couleur) p.push('<w:color w:val="'+xml(r.couleur)+'"/>');
+  if(r.taille) p.push('<w:sz w:val="'+demiPt(r.taille)+'"/>');
+  const rPr = p.length ? "<w:rPr>"+p.join("")+"</w:rPr>" : "";
+  return "<w:r>"+rPr+t(r.t)+"</w:r>";
+}
+
+function paragrapheXml(runs, opts){
+  opts = opts || {};
+  const p = [];
+  if(opts.aligne) p.push('<w:jc w:val="'+xml(opts.aligne)+'"/>');
+  // Espacement PROPRE AU PARAGRAPHE, en points. Le gabarit note_kemet le règle paragraphe par
+  // paragraphe (space_before / space_after de python-docx) : sans ça, tout retombe sur
+  // l'espacement par défaut du style et la note ne respire pas comme celle qui a été remise.
+  if(opts.avant !== undefined || opts.apres !== undefined){
+    const a = ['w:after="'+Math.round((opts.apres === undefined ? 0 : opts.apres) * 20)+'"'];
+    if(opts.avant !== undefined) a.unshift('w:before="'+Math.round(opts.avant * 20)+'"');
+    p.push("<w:spacing " + a.join(" ") + "/>");
+  }
+  if(opts.retraitGauche !== undefined){
+    p.push('<w:ind w:left="'+Math.round(opts.retraitGauche * 20)+'"/>');
+  }
+  if(opts.filetBas){
+    p.push('<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="2" w:color="'+
+           xml(opts.filetBas)+'"/></w:pBdr>');
+  }
+  // Filet GAUCHE épais : l'encadré du titre exécutif de note_kemet (sz=24, space=8).
+  if(opts.filetGauche){
+    p.push('<w:pBdr><w:left w:val="single" w:sz="24" w:space="8" w:color="'+
+           xml(opts.filetGauche)+'"/></w:pBdr>');
+  }
+  // Par le STYLE ListBullet, comme la reference : c'est lui qui porte contextualSpacing.
+  if(opts.puce) p.unshift('<w:pStyle w:val="ListBullet"/>');
+  const pPr = p.length ? "<w:pPr>"+p.join("")+"</w:pPr>" : "";
+  return "<w:p>"+pPr+(runs||[]).map(run).join("")+"</w:p>";
+}
+
+function celluleXml(runs, opts){
+  opts = opts || {};
+  const tcPr = ['<w:tcW w:type="dxa" w:w="'+(opts.largeur||4703)+'"/>'];
+  if(opts.fond) tcPr.push('<w:shd w:val="clear" w:fill="'+xml(opts.fond)+'"/>');
+  return "<w:tc><w:tcPr>"+tcPr.join("")+"</w:tcPr>"+paragrapheXml(runs)+"</w:tc>";
+}
+
+/* ---------------- nombres : un piege de portage, nomme ici une fois pour toutes ----------------
+   `str(99.0)` en Python rend "99.0" ; `String(99.0)` en JavaScript rend "99". Apres JSON.parse,
+   JS ne peut PLUS distinguer un entier d'un flottant : l'information est perdue a la lecture.
+   Consequence observee en comparant la note d'aout : le taux sortait « 99% » la ou le document
+   remis affiche « 99,0% ».
+
+   Le document remis porte d'ailleurs trois incoherences heritees de ce meme mecanisme :
+     - son titre ecrit « 99,0% » (virgule) mais son tableau « 99.8% » (point) ;
+     - il melange « 8% » (entier) et « 100.0% » (flottant) dans la MEME colonne.
+   Les reproduire reviendrait a transporter un defaut. `nombreFr` rend la forme francaise
+   coherente ; `nombrePy` reste disponible pour une reproduction litterale si elle est demandee. */
+function nombreFr(v, decimales){
+  if(v === null || v === undefined || v === "") return "";
+  const n = Number(v);
+  if(!isFinite(n)) return String(v);
+  const d = (decimales === undefined || decimales === null) ? 1 : decimales;
+  return n.toFixed(d).replace(".", ",");
+}
+function nombrePy(v, decimales){
+  if(v === null || v === undefined || v === "") return "";
+  const n = Number(v);
+  if(!isFinite(n)) return String(v);
+  return (decimales === undefined || decimales === null) ? String(n) : n.toFixed(decimales);
+}
+
+/* ---------------- les parties fixes du ZIP ---------------- */
+
+const CONTENT_TYPES =
+'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'+
+'<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'+
+'<Default Extension="xml" ContentType="application/xml"/>'+
+'<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'+
+'<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'+
+'<Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>'+
+'<Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>'+
+'<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>'+
+'<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>'+
+'</Types>';
+
+const RELS_RACINE =
+'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'+
+'</Relationships>';
+
+const RELS_DOCUMENT =
+'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'+
+'<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>'+
+'<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>'+
+'<Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>'+
+'<Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>'+
+'</Relationships>';
+
+// TableGrid : le style « Table Grid » de Word, redéfini ici parce qu'on n'embarque
+// pas le gabarit par défaut. Sans lui, le tableau sortirait SANS AUCUN trait.
+// Relations d'un document SANS en-tête ni pied : ni rId3 ni rId4. Un document qui référence
+// une partie absente s'ouvre mal ou se « répare » en silence.
+const RELS_DOCUMENT_SANS_ENTETE =
+'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'+
+'<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>'+
+'<Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>'+
+'</Relationships>';
+
+function styles(police, taille){
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+  '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'+
+  '<w:docDefaults><w:rPrDefault><w:rPr>'+
+    '<w:rFonts w:ascii="'+xml(police)+'" w:hAnsi="'+xml(police)+'" w:cs="'+xml(police)+'"/>'+
+    '<w:sz w:val="'+demiPt(taille)+'"/><w:szCs w:val="'+demiPt(taille)+'"/>'+
+  '</w:rPr></w:rPrDefault>'+
+  // Espacement de paragraphe par defaut, repris tel quel du document remis. Sans ce bloc, Word
+  // applique ses propres valeurs et le rendu s'ecarte de la reference sans qu'on sache pourquoi.
+  '<w:pPrDefault><w:pPr><w:spacing w:after="200" w:line="276" w:lineRule="auto"/></w:pPr></w:pPrDefault>'+
+  '</w:docDefaults>'+
+  '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>'+
+  // contextualSpacing : c'est LUI qui colle les puces entre elles. Sans lui chaque puce herite
+  // des 10 pt d'espacement de paragraphe et la liste se delite.
+  '<w:style w:type="paragraph" w:styleId="ListBullet"><w:name w:val="List Bullet"/>'+
+    '<w:basedOn w:val="Normal"/><w:pPr><w:numPr><w:numId w:val="1"/></w:numPr>'+
+    '<w:contextualSpacing/></w:pPr></w:style>'+
+  // TableNormal : le style de table par defaut dont TableGrid herite. Il porte les MARGES DE
+  // CELLULE (0 en haut et en bas, 108 twips a gauche et a droite) -- valeurs relevees dans le
+  // document remis.
+  '<w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/>'+
+    '<w:tblPr><w:tblInd w:w="0" w:type="dxa"/><w:tblCellMar>'+
+      '<w:top w:w="0" w:type="dxa"/><w:left w:w="108" w:type="dxa"/>'+
+      '<w:bottom w:w="0" w:type="dxa"/><w:right w:w="108" w:type="dxa"/>'+
+    '</w:tblCellMar></w:tblPr></w:style>'+
+  '<w:style w:type="table" w:styleId="TableGrid"><w:name w:val="Table Grid"/>'+
+    '<w:basedOn w:val="TableNormal"/>'+
+    // CE BLOC EST LA CAUSE DES LIGNES TROP HAUTES (vu par le DG, 16/09/2026). Les paragraphes
+    // d'une cellule heritent sinon des 10 pt d'espacement de docDefaults, et chaque ligne du
+    // tableau gagne une demi-ligne vide. Valeur relevee dans le document remis.
+    '<w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr>'+
+    '<w:tblPr><w:tblInd w:w="0" w:type="dxa"/><w:tblBorders>'+
+      '<w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>'+
+      '<w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>'+
+      '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>'+
+      '<w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>'+
+      '<w:insideH w:val="single" w:sz="4" w:space="0" w:color="auto"/>'+
+      '<w:insideV w:val="single" w:sz="4" w:space="0" w:color="auto"/>'+
+    '</w:tblBorders>'+
+    '<w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="108" w:type="dxa"/>'+
+      '<w:bottom w:w="0" w:type="dxa"/><w:right w:w="108" w:type="dxa"/></w:tblCellMar>'+
+  '</w:tblPr></w:style>'+
+  '</w:styles>';
+}
+
+// settings.xml — sans lui Word ouvre le document en << Mode de compatibilite >>. Le bloc compat
+// est celui du document remis (compatibilityMode 14, Word 2010) : etre fidele, c'est aussi ne pas
+// sortir du mode dans lequel les documents deja livres ont ete produits.
+const SETTINGS =
+'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+'<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'+
+'<w:compat><w:compatSetting w:name="compatibilityMode" '+
+  'w:uri="http://schemas.microsoft.com/office/word" w:val="14"/>'+
+'<w:compatSetting w:name="overrideTableStyleFontSizeAndJustification" '+
+  'w:uri="http://schemas.microsoft.com/office/word" w:val="1"/>'+
+'<w:compatSetting w:name="enableOpenTypeFeatures" '+
+  'w:uri="http://schemas.microsoft.com/office/word" w:val="1"/>'+
+'<w:compatSetting w:name="doNotFlipMirrorIndents" '+
+  'w:uri="http://schemas.microsoft.com/office/word" w:val="1"/></w:compat>'+
+'</w:settings>';
+
+// Une seule définition de puce, référencée par numId="1".
+// LE CARACTERE DE PUCE EST U+F0B7, PAS U+2022 (•). Dans la police Symbol, U+2022 ne designe
+// pas une puce : Word affiche alors un CARRE VIDE. Defaut vu par le DG en ouvrant le document,
+// invisible a tout controle automatique -- le XML etait valide et le texte correct.
+// Indentation left=360 (et non 720) : valeur relevee dans le document remis.
+const NUMBERING =
+'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+'<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'+
+'<w:abstractNum w:abstractNumId="0"><w:multiLevelType w:val="hybridMultilevel"/>'+
+'<w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="\uF0B7"/>'+
+'<w:lvlJc w:val="left"/><w:pPr><w:ind w:left="360" w:hanging="360"/></w:pPr>'+
+'<w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:hint="default"/></w:rPr></w:lvl>'+
+'</w:abstractNum>'+
+'<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>'+
+'</w:numbering>';
+
+function entetePied(balise, runs, aligne){
+  const ns = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    "<w:"+balise+" "+ns+">"+paragrapheXml(runs, {aligne:aligne})+"</w:"+balise+">";
+}
+
+/* ---------------- l'objet document ---------------- */
+
+const FORMATS = { LETTER:{w:12240, h:15840}, A4:{w:11906, h:16838} };
+
+function document(opts){
+  opts = opts || {};
+  const police = opts.police || "Calibri";
+  const taille = opts.taille || 11;
+  // Marges : un seul nombre pour les quatre côtés, ou {haut, bas, gauche, droite} en cm.
+  // note_kemet utilise 2,0 cm à gauche et à droite, 1,8 cm en haut et en bas.
+  const mDef = opts.margeCm === undefined ? 2.5 : opts.margeCm;
+  const mObj = (mDef && typeof mDef === "object") ? mDef : {};
+  const nb = function(v, d){ return v === undefined ? d : v; };
+  const mHaut   = cm(nb(mObj.haut,   typeof mDef === "number" ? mDef : 2.5));
+  const mBas    = cm(nb(mObj.bas,    typeof mDef === "number" ? mDef : 2.5));
+  const mGauche = cm(nb(mObj.gauche, typeof mDef === "number" ? mDef : 2.5));
+  const mDroite = cm(nb(mObj.droite, typeof mDef === "number" ? mDef : 2.5));
+  const fmt    = FORMATS[(opts.format||"LETTER").toUpperCase()] || FORMATS.LETTER;
+  const corps  = [];
+
+  const api = {
+    paragraphe(runs, o){ corps.push(paragrapheXml(runs, o)); return api; },
+    // Titre du document.
+    titre(texte, couleur, tailleTitre){
+      return api.paragraphe([{t:texte, gras:true, taille:tailleTitre||15, couleur:couleur||"03341C"}]);
+    },
+    // Ligne d'identification sous le titre.
+    soustitre(texte, couleur){
+      return api.paragraphe([{t:texte, italique:true, taille:10, couleur:couleur||"555555"}]);
+    },
+    // Rubrique : gras, vert profond, soulignée d'un filet or — la signature Kemet.
+    rubrique(texte, couleur, filet){
+      return api.paragraphe([{t:texte, gras:true, taille:13, couleur:couleur||"03341C"}],
+                            {filetBas: filet||"C4A41E"});
+    },
+    puce(texte, tailleP){
+      return api.paragraphe([{t:texte, taille:tailleP||10}], {puce:true});
+    },
+    // entetes : [{t, ...}] ; lignes : [[{runs, fond}, ...], ...]
+    tableau(entetes, lignes, o){
+      o = o || {};
+      const largeur = o.largeur || 4703;
+      // fondEntete:false (ou null) = AUCUN ombrage ; couleurEntete choisit la couleur du
+      // texte d'en-tête. Ajouté le 17/09/2026 pour la note d'écart de caisse, le SEUL
+      // document de la maison dont l'en-tête de tableau n'est pas blanc sur vert : la
+      // référence l'écrit en vert profond, sans ombrage. Strictement rétro-compatible —
+      // un appelant qui ne passe ni l'un ni l'autre retombe sur l'ancien comportement.
+      const fondEntete = (o.fondEntete === false || o.fondEntete === null) ? null
+                       : (o.fondEntete || "076739");
+      const couleurEntete = o.couleurEntete || "FFFFFF";
+      // ALIGNEMENT DU TABLEAU. Les notes sur mesure (conformité, ruptures) centrent les leurs ;
+      // le gabarit partagé note_kemet les laisse à GAUCHE. Le centrage reste le défaut pour ne
+      // rien changer à l'existant ; passer `aligne:null` (ou "left") l'ôte.
+      const alignement = (o.aligne === undefined) ? "center" : o.aligne;
+      const jc = (alignement && alignement !== "left")
+        ? '<w:jc w:val="'+xml(alignement)+'"/>' : "";
+      const parts = ['<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/>'+
+        '<w:tblW w:type="auto" w:w="0"/>'+ jc +
+        '<w:tblLook w:firstColumn="1" w:firstRow="1" w:lastColumn="0" w:lastRow="0" '+
+        'w:noHBand="0" w:noVBand="1" w:val="04A0"/></w:tblPr>'];
+      // <w:tblGrid> est OBLIGATOIRE au schema : il declare la largeur des colonnes. Sans lui le
+      // XML reste BIEN FORME -- mais python-docx refuse d'ouvrir le fichier et Word le repare en
+      // silence. Oubli trouve en OUVRANT le document produit, pas en le validant : un XML valide
+      // ne prouve pas qu'un document s'ouvre. C'est la raison d'etre du controle d'ouverture.
+      parts.push("<w:tblGrid>" + entetes.map(function(){ return '<w:gridCol w:w="'+largeur+'"/>'; }).join("") + "</w:tblGrid>");
+      parts.push("<w:tr>"+entetes.map(h=>celluleXml(
+        [{t:h, gras:true, couleur:couleurEntete, taille:o.tailleEntete||9}],
+        {fond:fondEntete, largeur:largeur})).join("")+"</w:tr>");
+      for(const ligne of lignes){
+        parts.push("<w:tr>"+ligne.map(c=>celluleXml(
+          [{t:c.t, gras:c.gras, italique:c.italique, couleur:c.couleur, taille:c.taille||o.taille||10}],
+          {fond:c.fond, largeur:largeur})).join("")+"</w:tr>");
+      }
+      parts.push("</w:tbl>");
+      corps.push(parts.join(""));
+      return api;
+    },
+    // Rend le .docx sous forme de Blob. Le ZIP est produit par JSZip, déjà embarqué.
+    async blob(){
+      const JS = glob.JSZip;
+      if(!JS) throw new Error("JSZip absent : le document ne peut pas être fabriqué.");
+      const zip = new JS();
+      // Un document PEUT n'avoir ni en-tête ni pied : c'est le cas de la note produite par
+      // note_kemet, dont le .docx ne contient aucune partie header/footer. Référencer des
+      // parties absentes ferait un fichier incohérent.
+      const avecEnteteEtPied = opts.enteteEtPied !== false;
+      const refs = avecEnteteEtPied
+        ? '<w:headerReference w:type="default" r:id="rId3"/>'+
+          '<w:footerReference w:type="default" r:id="rId4"/>'
+        : "";
+      const sectPr = '<w:sectPr>'+ refs +
+        '<w:pgSz w:w="'+fmt.w+'" w:h="'+fmt.h+'"/>'+
+        '<w:pgMar w:top="'+mHaut+'" w:right="'+mDroite+'" w:bottom="'+mBas+'" w:left="'+mGauche+
+          '" w:header="720" w:footer="720" w:gutter="0"/>'+
+        '<w:cols w:space="720"/></w:sectPr>';
+      const doc = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '+
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
+        "<w:body>"+corps.join("")+sectPr+"</w:body></w:document>";
+      zip.file("[Content_Types].xml", CONTENT_TYPES);
+      zip.folder("_rels").file(".rels", RELS_RACINE);
+      const w = zip.folder("word");
+      w.file("document.xml", doc);
+      w.file("styles.xml", styles(police, taille));
+      w.file("numbering.xml", NUMBERING);
+      w.file("settings.xml", SETTINGS);
+      if(avecEnteteEtPied){
+        w.file("header1.xml", entetePied("hdr", opts.entete || [], "right"));
+        w.file("footer1.xml", entetePied("ftr", opts.pied || [], "center"));
+      }
+      w.folder("_rels").file("document.xml.rels",
+        avecEnteteEtPied ? RELS_DOCUMENT : RELS_DOCUMENT_SANS_ENTETE);
+      return zip.generateAsync({type:"blob",
+        mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+    },
+    // Porte de service pour les bancs : rendre l'XML sans passer par le ZIP.
+    _documentXml(){ return corps.join(""); },
+  };
+  return api;
+}
+
+glob.KemetLivrables = { document: document, FORMATS: FORMATS,
+  nombreFr: nombreFr, nombrePy: nombrePy,
+  _xml: xml, _xmlTexte: xmlTexte, _cm: cm, _demiPt: demiPt };
+
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
 <script id="guide-collecte">
 (function(glob){
 "use strict";
@@ -5857,10 +6253,256 @@ GROUPES.push({
   }, []),
 });
 
+// ===========================================================================
+// EMPORTER LA LISTE SUR LE POSTE DE MÉDICIEL — 01/10/2026, demande du DG.
+//
+// « Actuellement la collecte des données se fait à partir d'un autre ordinateur, donc
+// l'appli doit pouvoir générer à tout moment cette liste et permettre à l'utilisateur d'aller
+// sur un autre poste obtenir les fichiers. » Jusqu'ici la liste n'existait qu'à l'écran — et
+// sur un document Word produit HORS de l'application, à la demande, par le cabinet.
+//
+// TROIS CHOSES, communes aux trois pôles et écrites UNE fois ici, parce que trois copies
+// finiraient par dire trois choses (c'est le défaut du 28/09/2026 sous une autre forme) :
+//   · la QUESTION « où allez-vous chercher ces fichiers ? ». La réponse est retenue sur CET
+//     ordinateur : c'est l'ordinateur qui a Médiciel ou non, pas l'officine ;
+//   · le DOCUMENT du mois. Il est construit à partir de la liste que l'écran VIENT d'afficher —
+//     statut de chaque pièce compris — pour que le papier et l'écran ne puissent pas se
+//     contredire ;
+//   · « seulement ce qui manque encore », dès qu'un premier dépôt a été fait.
+// ===========================================================================
+
+// Les portes d'entrée de Médiciel. Elles étaient écrites à la main dans le générateur Word ;
+// elles vivent désormais ici, avec le reste du catalogue, pour le papier comme pour l'écran.
+const ENTREES_MEDICIEL = [
+  ["Les états numérotés", "Accueil → ESPACE PHARMACIENS → « Centre Impres. » → onglets GESTION DE STOCKS / ÉTATS COMPTABLES"],
+  ["Les factures et règlements clients", "Accueil → FACTURATION CLIENTS → « Compte Client » (onglets Facturation · Gestion des Comptes Clients · Liste des Règlements)"],
+  ["Les bons de livraison fournisseurs", "Accueil → MOUVEMENTS DE STOCK → « Liste BL/Avoirs »"],
+  ["Les réclamations", "Accueil → MOUVEMENTS DE STOCK → « Liste réclamat° »"],
+  ["Les corrections de stock", "Accueil → MOUVEMENTS DE STOCK → « Liste correct° »"],
+  ["Les ruptures", "Accueil → COMMANDES → « Ruptures »"],
+  ["L'inventaire", "Accueil → PRODUITS → « Inventaire »"],
+];
+// Les réglages de la fiche qui changent les chiffres de la Trésorerie autant qu'un fichier.
+// Même raison de vivre ici : ils étaient recopiés à la main dans le générateur.
+const REGLAGES_TRESORERIE = [
+  ["ecart_caisse.operateurs_exclus",
+   "Les opérateurs qui ne tiennent pas de caisse (le titulaire, un compte de service). " +
+   "Leurs journées sortent de TOUS les calculs d'écart de caisse, et le journal les nomme."],
+  ["versements.wave_beneficiaire",
+   "Le ou les bénéficiaires attendus des injections Wave, À L'ORTHOGRAPHE EXACTE de l'export. " +
+   "Une lettre d'écart fait lire Wave à 0 F, sans aucun avertissement. Écrire « aucun » si " +
+   "l'officine n'a réellement aucune injection : c'est une réponse, pas un oubli."],
+  ["bfr.dmp_jours",
+   "Le délai de paiement des fournisseurs, en jours (20 par défaut : une quinzaine plus cinq " +
+   "jours). Il sert à ESTIMER les dettes fournisseurs du BFR — ce chiffre le déplace autant " +
+   "que le stock."],
+];
+
+const MOIS_NOMS = ["janvier","février","mars","avril","mai","juin","juillet","août",
+                   "septembre","octobre","novembre","décembre"];
+function moisEnClair(periode){
+  const m = /^(\d{4})-(\d{2})$/.exec(String(periode || ""));
+  return m ? (MOIS_NOMS[+m[2] - 1] + " " + m[1]) : String(periode || "");
+}
+function _horodatage(){
+  const d = new Date();
+  const z = function(n){ return String(n).padStart(2, "0"); };
+  return z(d.getDate()) + "/" + z(d.getMonth() + 1) + "/" + d.getFullYear() + " à " +
+         z(d.getHours()) + "h" + z(d.getMinutes());
+}
+function _sansAccent(s){
+  return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
+
+/* ---------- la question : où se fait la collecte ? ----------
+   Retenue dans la mémoire de CE navigateur, pour CE pôle. Si le navigateur refuse (navigation
+   privée, stockage bloqué), la question est simplement reposée à chaque fois — jamais une
+   erreur. */
+const LIEU_CLE = "kemet-pulse:collecte-lieu";
+function lieuCollecte(){
+  try{
+    const v = glob.localStorage && glob.localStorage.getItem(LIEU_CLE);
+    return (v === "ici" || v === "ailleurs") ? v : "";
+  }catch(e){ return ""; }
+}
+function retenirLieuCollecte(v){
+  try{
+    if(v === "ici" || v === "ailleurs") glob.localStorage.setItem(LIEU_CLE, v);
+    else glob.localStorage.removeItem(LIEU_CLE);
+    return true;
+  }catch(e){ return false; }
+}
+
+/* ---------- le modèle : ce que l'écran vient d'afficher ----------
+   modele = { pole, periode, officine?, groupes:[{ num, titre, statut, note?, pieces:[
+              { texte, ou, piege, option, statut, manque? } ] }] }
+   statut d'un GROUPE : "recu" | "a-fournir" | "memoire" | null (statut tenu pièce par pièce)
+   statut d'une PIÈCE : "recue" | "incomplete" | "a-fournir" | "facultative" | null
+   Une pièce est À PRENDRE si ni elle ni son groupe ne sont reçus. Une pièce incomplète l'est :
+   il reste quelque chose à aller chercher. */
+function aPrendre(groupe, piece){
+  return groupe.statut !== "recu" && piece.statut !== "recue";
+}
+function compterCollecte(modele){
+  let total = 0, prendre = 0;
+  (modele && modele.groupes || []).forEach(function(g){
+    g.pieces.forEach(function(p){ total++; if(aPrendre(g, p)) prendre++; });
+  });
+  return { total: total, aPrendre: prendre, recues: total - prendre };
+}
+
+/* ---------- le document Word du mois ----------
+   Fabriqué par noyau-livrables, déjà embarqué : aucune dépendance nouvelle, aucun réseau.
+   Rend { blob, nb, nomFichier }. */
+function _marque(g, p){
+  if(p.statut === "recue" || g.statut === "recu") return "✓ DÉJÀ REÇUE — ";
+  if(p.statut === "incomplete") return "☐ INCOMPLÈTE — ";
+  if(p.option || p.statut === "facultative") return "☐ FACULTATIF — ";
+  return "☐ INDISPENSABLE — ";
+}
+function documentDeCollecte(modele, opts){
+  opts = opts || {};
+  const L = glob.KemetLivrables;
+  if(!L || !L.document)
+    return Promise.reject(new Error("la fabrique de documents Word n'est pas embarquée dans cette application"));
+  const U = glob.KemetUtil;
+  const seulement = !!opts.seulementManquantes;
+  const mois = moisEnClair(modele.periode);
+  const groupes = modele.groupes.map(function(g){
+    return { g: g, pieces: g.pieces.filter(function(p){ return !seulement || aPrendre(g, p); }) };
+  }).filter(function(x){ return x.pieces.length; });
+  const nb = groupes.reduce(function(n, x){ return n + x.pieces.length; }, 0);
+
+  const doc = L.document({ format:"A4", margeCm:1.5, taille:10,
+    entete:[{ t:"Kemet Services · pièces à collecter · " + mois, taille:8, couleur:"555555" }],
+    pied:[{ t:"Cocher chaque pièce une fois produite. De retour sur l'application : choisir « " +
+              mois + " » en haut de l'écran, puis tout déposer en un seul lot.", taille:8, couleur:"555555" }] });
+  doc.titre("LES PIÈCES À COLLECTER — " + mois.toUpperCase());
+  doc.soustitre([modele.pole, modele.officine].filter(Boolean).join(" · ") +
+                " · liste établie le " + (opts.horodatage || _horodatage()) +
+                (U && U.APP_VERSION ? " · Kemet Pulse v" + U.APP_VERSION : ""));
+  doc.paragraphe([{ gras:true, t: seulement
+    ? "Seulement ce qui manque encore : " + nb + " pièce" + (nb > 1 ? "s" : "") +
+      ". Les pièces que l'application a déjà reçues n'y figurent pas."
+    : nb + " pièce" + (nb > 1 ? "s" : "") + " pour " + mois + ". Les dates sont déjà celles du mois." }]);
+  if(!nb) doc.paragraphe([{ t:"Rien à aller chercher : l'application a déjà reçu toutes les pièces de ce mois." }]);
+
+  doc.rubrique("Comment s'en servir");
+  doc.puce("Emporter ce document sur le poste où se trouve Médiciel.");
+  doc.puce("Pour chaque ligne : produire l'état au LIBELLÉ EXACT, aux dates indiquées, l'enregistrer, puis cocher la case.");
+  doc.puce("Le nom d'un fichier ne prouve rien : ouvrir chaque fichier et vérifier qu'il porte bien l'état demandé avant de l'emporter.");
+  doc.puce("Ne pas renommer les fichiers, sauf quand la colonne « À surveiller » le demande.");
+  doc.puce("De retour sur l'application : choisir « " + mois + " » en haut de l'écran, onglet « Déposer les fichiers », et tout déposer en un seul lot.");
+
+  doc.rubrique("Par où commencer dans Médiciel");
+  ENTREES_MEDICIEL.forEach(function(e){ doc.paragraphe([{ t:e[0] + " : ", gras:true }, { t:e[1] }]); });
+
+  groupes.forEach(function(x){
+    // Un groupe « pour mémoire » se dit dans sa note, pas dans son titre : le groupe 8 sert la
+    // Trésorerie, et « pour mémoire » l'aurait fait passer pour facultatif.
+    const st = x.g.statut === "recu" ? " — pièces déjà reçues" : "";
+    doc.rubrique(x.g.num + ". " + x.g.titre + st);
+    if(x.g.note) doc.soustitre(x.g.note);
+    doc.tableau(["Pièce — libellé exact", "Où la produire", "À surveiller"],
+      x.pieces.map(function(p){
+        return [
+          { t: _marque(x.g, p) + p.texte },
+          { t: p.ou || "—" },
+          { t: (p.manque ? "INCOMPLÈTE : " + p.manque + " — " : "") + (p.piege || "—"),
+            italique:true, couleur:"555555" },
+        ];
+      }), { largeur:3400, aligne:null, taille:9, tailleEntete:9 });
+  });
+
+  const nomFichier = "Pieces_a_collecter_" + _sansAccent(modele.pole) + "_" +
+    _sansAccent(mois) + (seulement ? "_ce_qui_manque" : "") + ".docx";
+  return doc.blob().then(function(blob){ return { blob: blob, nb: nb, nomFichier: nomFichier }; });
+}
+
+/* ---------- l'encart de l'écran « Les pièces du mois » ----------
+   `esc` est celui du pôle : ce bloc n'en invente pas un second. */
+function htmlCollecte(modele, esc){
+  const lieu = lieuCollecte();
+  const c = compterCollecte(modele);
+  const mois = moisEnClair(modele.periode);
+  const btn = function(classe, attr, val, texte){
+    return '<button class="kp-btn ' + classe + ' kp-btn--sm" type="button" ' + attr + '="' + esc(val) + '">' + esc(texte) + '</button>';
+  };
+  let h = '<div class="gc-collecte">';
+  if(!lieu){
+    h += '<p class="kp-body"><b>Où allez-vous chercher les fichiers de ' + esc(mois) + ' ?</b></p>' +
+      '<div class="kp-toolbar">' +
+        btn("kp-btn--secondary", "data-collecte-lieu", "ici", "Sur cet ordinateur") +
+        btn("kp-btn--secondary", "data-collecte-lieu", "ailleurs", "Sur un autre poste (celui de Médiciel)") +
+      '</div>' +
+      '<p class="kp-small kp-muted">La réponse est retenue sur cet ordinateur et se change à tout moment. ' +
+      'Sur un autre poste, l\'application vous donne la liste à emporter.</p>';
+  } else if(lieu === "ailleurs"){
+    h += '<p class="kp-body">Emportez la liste sur le poste de Médiciel : elle porte le libellé exact de ' +
+      'chaque pièce, le chemin pour la produire, le piège à éviter et les dates de ' + esc(mois) + '.</p>' +
+      '<div class="kp-toolbar">' +
+        btn("kp-btn--primary", "data-collecte-doc", "tout", "Télécharger la liste de " + mois + " (Word)") +
+        (c.recues && c.aPrendre
+          ? btn("kp-btn--secondary", "data-collecte-doc", "manquantes",
+                "Seulement ce qui manque encore (" + c.aPrendre + ")")
+          : "") +
+      '</div>' +
+      '<p class="kp-small kp-muted">Collecte sur un autre poste · ' +
+        btn("kp-btn--quiet", "data-collecte-lieu", "", "changer") + '</p>';
+  } else {
+    h += '<p class="kp-small kp-muted">Collecte sur cet ordinateur · ' +
+      btn("kp-btn--quiet", "data-collecte-doc", "tout", "emporter quand même la liste (Word)") + ' · ' +
+      btn("kp-btn--quiet", "data-collecte-lieu", "", "changer") + '</p>';
+  }
+  return h + '</div>';
+}
+
+/* Un seul écouteur, posé sur le conteneur : l'encart est redessiné à chaque rendu, le conteneur
+   reste. hote = { modele(), journal(niv, msg), redessiner() }. */
+function _telecharger(nom, blob){
+  const a = glob.document.createElement("a");
+  a.href = glob.URL.createObjectURL(blob);
+  a.download = nom;
+  glob.document.body.appendChild(a); a.click(); glob.document.body.removeChild(a);
+  setTimeout(function(){ glob.URL.revokeObjectURL(a.href); }, 2000);
+}
+function brancherCollecte(conteneur, hote){
+  if(!conteneur || conteneur._collecteBranchee) return;
+  conteneur._collecteBranchee = true;
+  conteneur.addEventListener("click", function(e){
+    const bLieu = e.target.closest && e.target.closest("[data-collecte-lieu]");
+    if(bLieu){
+      retenirLieuCollecte(bLieu.getAttribute("data-collecte-lieu"));
+      hote.redessiner();
+      return;
+    }
+    const bDoc = e.target.closest && e.target.closest("[data-collecte-doc]");
+    if(!bDoc) return;
+    bDoc.disabled = true;
+    const seulement = bDoc.getAttribute("data-collecte-doc") === "manquantes";
+    Promise.resolve().then(function(){
+      return documentDeCollecte(hote.modele(), { seulementManquantes: seulement });
+    }).then(function(r){
+      _telecharger(r.nomFichier, r.blob);
+      hote.journal("ok", "Liste des pièces téléchargée : " + r.nomFichier + " (" + r.nb + " pièce" +
+                   (r.nb > 1 ? "s" : "") + (seulement ? ", seulement ce qui manque encore" : "") + ").");
+    }).catch(function(err){
+      hote.journal("err", "La liste des pièces n'a pas pu être fabriquée : " + ((err && err.message) || err) + ".");
+    }).then(function(){ bDoc.disabled = false; });
+  });
+}
+
 glob.KemetGuideCollecte = { GROUPES:GROUPES, GROUPES_TRESORERIE:GROUPES_TRESORERIE,
                             GROUPES_PARAPHARMACIE:GROUPES_PARAPHARMACIE,
                             jetons:jetons, resoudre:resoudre, piecesDuMois:piecesDuMois,
-                            nbPieces:nbPieces, refs:refs };
+                            nbPieces:nbPieces, refs:refs,
+                            // la liste a emporter sur le poste de Mediciel (01/10/2026)
+                            ENTREES_MEDICIEL:ENTREES_MEDICIEL, REGLAGES_TRESORERIE:REGLAGES_TRESORERIE,
+                            moisEnClair:moisEnClair, lieuCollecte:lieuCollecte,
+                            retenirLieuCollecte:retenirLieuCollecte, aPrendre:aPrendre,
+                            compterCollecte:compterCollecte, documentDeCollecte:documentDeCollecte,
+                            htmlCollecte:htmlCollecte, brancherCollecte:brancherCollecte };
 })(window);
 </script>
 <script id="lexique-note">
@@ -9833,19 +10475,45 @@ function jetonPiece(classe, mot){
 }
 const SOURCE_LISIBLE = { mediciel:"export Médiciel", officine:"tenu par l'officine" };
 
+/* LE MODÈLE DE « LES PIÈCES DU MOIS » (01/10/2026) : ce que l'écran affiche ET ce que la liste à
+   emporter sur le poste de Médiciel imprime — calculé UNE fois, pour que le papier et l'écran ne
+   puissent pas se contredire. Ce pôle tient le statut PIÈCE PAR PIÈCE. */
+function modelePiecesDuMois(){
+  const GC = window.KemetGuideCollecte;
+  const vues = piecesVues();
+  const partielles = piecesPartielles();
+  const off = MEM.etat.officine;
+  return {
+    pole: "Parapharmacie",
+    periode: etat.periode,
+    officine: U.strip((off && off.config && off.config.nom_pharmacie) || ""),
+    groupes: GC.GROUPES_PARAPHARMACIE.map(g=>({ num:g.num, titre:g.titre, statut:null,
+      pieces: GC.piecesDuMois(g, etat.periode).map(p=>Object.assign({}, p, {
+        // Trois états, et la nuance compte : une pièce facultative NON déposée n'est pas un
+        // manque, une pièce INCOMPLÈTE en est un même si un fichier est arrivé.
+        statut: partielles[p.ref] ? "incomplete"
+              : (vues.has(p.ref) ? "recue" : (p.option ? "facultative" : "a-fournir")),
+        manque: partielles[p.ref] || "",
+      })),
+    })),
+  };
+}
+
 function rendrePiecesDuMois(){
   const cont = document.getElementById("pieces-du-mois");
   if(!cont) return;
   const GC = window.KemetGuideCollecte;
   if(!GC || !GC.GROUPES_PARAPHARMACIE || !etat.periode){ cont.innerHTML = ""; return; }
-  const vues = piecesVues();
-  const partielles = piecesPartielles();
+  const m = modelePiecesDuMois();
+  const toutes = [].concat.apply([], m.groupes.map(g=>g.pieces));
+  const total = toutes.length;
+  const obligatoires = toutes.filter(p=>!p.option);
+  // Une pièce incomplète compte comme MANQUANTE dans le décompte du bandeau : il reste
+  // bien quelque chose à aller chercher dans Médiciel.
+  const manquantes = obligatoires.filter(p=>p.statut !== "recue");
 
-  const total = GC.nbPieces(GC.GROUPES_PARAPHARMACIE);
-  const obligatoires = [];
-  GC.GROUPES_PARAPHARMACIE.forEach(g=>g.pieces.forEach(p=>{ if(!p.option) obligatoires.push(p.ref); }));
-  const manquantes = obligatoires.filter(r=>!vues.has(r) || partielles[r]);
-
+  // Le bandeau dit l'etat en UN coup d'oeil, avec le compte exact. « Il manque 2 pieces »
+  // se verifie ; « des pieces manquent » ne se verifie pas.
   const classeBandeau = manquantes.length ? "vigilance" : "conforme";
   const phrase = manquantes.length
     ? "Il manque "+manquantes.length+" pièce"+(manquantes.length>1?"s":"")+" indispensable"+
@@ -9859,33 +10527,37 @@ function rendrePiecesDuMois(){
     '<p class="kp-body">'+esc(phrase)+'</p>'+
     '<p class="kp-body kp-secondary">'+total+' pièces en tout, dont '+obligatoires.length+
     ' indispensables — ce sont les MÊMES fichiers que le groupe 1 du pôle Achat.</p>';
+  // OÙ SE FAIT LA COLLECTE (01/10/2026) — hors du volet replié : c'est la première question.
+  if(GC.htmlCollecte) html += GC.htmlCollecte(m, esc);
 
-  for(const g of GC.GROUPES_PARAPHARMACIE){
   // REPLIE PAR DEFAUT (11/09/2026, demande DG) : la liste des pieces, avec ses captures
   // d'ecran Mediciel, tombait en entier des la creation d'une officine, avant tout depot --
   // trois ecrans d'images qu'on n'avait pas demandes. Elle reste a sa place, fermee : le
   // resume dit ce qui manque, un clic ouvre le detail. Les images sont en loading=lazy,
   // elles ne se chargent qu'a l'ouverture.
+  // UN SEUL VOLET POUR TOUS LES GROUPES (corrigé le 01/10/2026) : il était ouvert UNE FOIS PAR
+  // GROUPE et refermé une seule fois — les groupes s'emboîtaient les uns dans les autres, et il
+  // fallait déplier trois volets successifs pour voir le dernier.
   html += '<details class="gc-details"><summary class="gc-summary">'+esc(manquantes.length ? 'Voir les pièces à fournir ('+manquantes.length+' manquante'+(manquantes.length>1?'s':'')+')' : 'Voir la liste des pièces (tout est reçu)')+'</summary>';
-    const refsGroupe = g.pieces.map(p=>p.ref);
-    const recues = refsGroupe.filter(r=>vues.has(r) && !partielles[r]).length;
-    html += '<div class="gc-groupe'+(recues === refsGroupe.length ? ' gc-groupe--servi' : '')+'">'+
+  for(const g of m.groupes){
+    const recues = g.pieces.filter(p=>p.statut === "recue").length;
+    html += '<div class="gc-groupe'+(recues === g.pieces.length ? ' gc-groupe--servi' : '')+'">'+
       '<p class="gc-titre">'+esc(g.num+" · "+g.titre)+
-      ' <span class="kp-small kp-secondary">'+recues+'/'+refsGroupe.length+'</span></p>';
+      ' <span class="kp-small kp-secondary">'+recues+'/'+g.pieces.length+'</span></p>';
 
-    for(const p of GC.piecesDuMois(g, etat.periode)){
-      const recue = vues.has(p.ref);
-      const incomplete = partielles[p.ref];
-      const jeton = incomplete ? jetonPiece("vigilance","Incomplète")
-                  : (recue ? jetonPiece("conforme","Reçue")
-                  : (p.option ? jetonPiece("absent","Facultative")
-                              : jetonPiece("vigilance","À fournir")));
+    for(const p of g.pieces){
+      const jeton = p.statut === "incomplete" ? jetonPiece("vigilance","Incomplète")
+                  : p.statut === "recue" ? jetonPiece("conforme","Reçue")
+                  : p.statut === "facultative" ? jetonPiece("absent","Facultative")
+                  : jetonPiece("vigilance","À fournir");
       html += '<div class="gc-piece"><div>'+jeton+' '+esc(p.texte)+'</div>';
-      if(incomplete) html += '<p class="gc-piege">'+esc(incomplete)+'</p>';
+      if(p.manque) html += '<p class="gc-piege">'+esc(p.manque)+'</p>';
       if(p.ou) html += '<p class="gc-ou">Où : '+esc(p.ou)+
         (p.src ? ' <span class="kp-micro kp-muted">('+esc(SOURCE_LISIBLE[p.src]||p.src)+')</span>' : '')+
         '</p>';
       if(p.piege) html += '<p class="gc-piege">'+esc(p.piege)+'</p>';
+      // Hors ligne, les captures ne se chargent pas : on le DIT au lieu de laisser une image
+      // cassee. Meme traitement que dans l'application Achat.
       for(const src of p.img){
         html += '<img class="gc-img" loading="lazy" alt="" src="'+esc(src)+'" '+
           'onerror="this.classList.add(\'masque\');'+
@@ -9898,6 +10570,9 @@ function rendrePiecesDuMois(){
   }
   html += '</details>';
   cont.innerHTML = html + '</div></div>';
+  // Les boutons de l'encart : un seul écouteur, posé une fois sur le conteneur.
+  if(GC.brancherCollecte) GC.brancherCollecte(cont, { modele: modelePiecesDuMois,
+    journal: journalLigne, redessiner: rendrePiecesDuMois });
 }
 
 /* ---------- les tendances — même mécanique que les deux autres pôles, sans ligne d'objectif ---------- */
