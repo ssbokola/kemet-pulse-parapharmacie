@@ -34,12 +34,12 @@ Aucun serveur, aucune base, aucune bibliotheque distante : tout est lu dans ce
 navigateur, et le programme lui-meme est dans ce fichier.
 
 Blocs partages avec l'application officine, copies tels quels a la construction :
-     noyau-util         SHA-1 a82d55c691e3
+     noyau-util         SHA-1 aa1712ffeb22
      noyau-lecture      SHA-1 e0fe1671960a
      noyau-equivalences SHA-1 e4781ef666cd
      noyau-agregation   SHA-1 bf1537e1a8bd
-     noyau-sauvegarde   SHA-1 750e1874e1ea
-     noyau-cloud        SHA-1 212b4bbac115
+     noyau-sauvegarde   SHA-1 40090dd31459
+     noyau-cloud        SHA-1 6173c554ca5d
      guide-collecte     SHA-1 7b83fce7b978
      lexique-note       SHA-1 fafe3bc584c3
      modules-registre   SHA-1 7bad12a353a3
@@ -585,6 +585,17 @@ a:focus-visible, .kp-link:focus-visible { outline: 2px solid var(--accent); outl
   display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-small);
   color: var(--text-secondary); margin-left: var(--sp-3);
 }
+/* Arbitrages de synchro (01/10/2026) : une ligne par case écrite différemment sur deux
+   appareils, les deux versions côte à côte, un bouton sous chacune. */
+.kp-arb { display: grid; gap: var(--sp-3); margin-top: var(--sp-3); }
+.kp-arb__ligne { border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--sp-3);
+  background: var(--surface-1); display: grid; gap: var(--sp-2); }
+.kp-arb__titre { font-weight: 600; }
+.kp-arb__versions { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--sp-3); }
+.kp-arb__version { display: grid; gap: var(--sp-2); align-content: start; }
+.kp-arb__etiquette { font-size: var(--fs-small); color: var(--text-secondary); }
+.kp-arb__texte { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--fs-small);
+  background: var(--surface-2); border-radius: var(--r-1, 4px); padding: var(--sp-2) var(--sp-3); }
 
 /* ---- Écran de validation des captures d'inventaire (18/08/2026) ---- */
 .kp-ocr__boite {
@@ -2043,8 +2054,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 // rapports remis au client. Avec vingt abonnés sur des versions différentes, « quelle
 // version a mon client ? » doit avoir une réponse. Le banc test_version.js refuse la
 // publication si une source a été modifiée APRÈS cette date.
-const APP_VERSION = "1.4.4";
-const APP_DATE = "2026-09-30";
+const APP_VERSION = "1.4.5";
+const APP_DATE = "2026-10-01";
 
 /* ---------- primitives façon Python (portées de conformite-bl-app.html) ---------- */
 
@@ -3372,6 +3383,9 @@ function cleDe(officine){
   return slugifie((officine && officine.config && officine.config.nom_pharmacie) || "");
 }
 
+// UN CHAMP AJOUTÉ À LA FICHE — ici ou à la volée par un pôle — S'AJOUTE AUSSI À REGLES_FUSION
+// (plus bas, avec la fusion des versions). Sinon la synchro cloud s'arrête et le nomme : c'est
+// voulu, la fusion ne devine pas la règle d'un champ que personne n'a décidée.
 function officineVierge(nom){
   return {
     version_standard: SCHEMA_VERSION,
@@ -3529,7 +3543,66 @@ function slugifie(s){ return U.normLibre(s||"officine").toLowerCase().replace(/[
 // et le 15/09/2026 a montré qu'il ne vit nulle part ailleurs qu'au fond du blob chiffré
 // d'IndexedDB — vider IndexedDB le perdait, rendant le code de récupération inutilisable faute
 // de savoir à quelle officine l'appliquer. Ce fichier devient sa trace hors ligne.
-const SECRETS_CLOUD_HORS_FICHIER = ["_cloud_local", "_cloud_version"];
+/* ==========================================================================
+   CE QUI NE SORT PAS DE CET APPAREIL — LA LISTE MAÎTRESSE
+   ==========================================================================
+   Posée le 30/09/2026, quand le Directeur Général a décidé de brancher la synchro cloud sur
+   le pôle Trésorerie. Trois raisons distinctes de ne pas voyager, et il faut les tenir
+   séparées parce qu'elles ne se lèvent pas ensemble :
+
+   LOCAL À L'APPAREIL — la valeur n'a de sens que sur ce poste.
+     `_cloud_local`   : encKey‖authKey chiffrées sous LE CODE À 5 CHIFFRES DE CET APPAREIL.
+                        Illisible ailleurs. L'envoyer ne fuiterait rien mais casserait la
+                        synchro du poste qui la recevrait, sans que rien ne le signale avant
+                        le prochain échec.
+     `_cloud_version` : « la version que CE poste croit connaître ». Partagée, elle fausse le
+                        verrou optimiste du poste suivant.
+     `_cloud_ancre`   : l'état de la dernière synchro réussie, par appareil. Dans le blob, elle
+                        se mesurerait elle-même — l'empreinte changerait à chaque poussée.
+
+   LOCAL AU PÔLE — la même fiche est ouverte par trois applications différentes.
+     `perimetre_kpi`  : `officineVierge()` pose la liste blanche de l'ACHAT ; la Trésorerie et
+                        la Parapharmacie la remplacent par la leur à la création. Partagée,
+                        les trois pôles se l'arrachent.
+     `pole`           : un seul champ pour trois applications : le partager, c'est le rendre faux.
+
+   SECRET QUI NE QUITTE PAS LE POSTE — décision du DG du 30/09/2026.
+     `journal_password` : le mot de passe du journal de banque. Il est déjà hors du fichier de
+                        sauvegarde téléchargé depuis le 26/09 ; il est désormais aussi hors du
+                        cloud. Le Gérant le ressaisit une fois par poste. Un secret qui ne
+                        voyage pas ne peut pas fuir, et la règle devient tenable d'un mot :
+                        ce mot de passe ne quitte jamais l'ordinateur où il a été tapé.
+
+   ÉTAT D'EXÉCUTION — `_synchroCloud` est écrit et effacé à chaque cycle. Sa place est en
+     mémoire, pas dans un blob.
+
+   LES CHEMINS PARTENT DE LA RACINE DE LA FICHE, pas de `config` : `_synchroCloud` est à la
+   racine, et le jour où un champ local apparaîtra ailleurs qu'en dessous de `config`, la liste
+   n'aura pas à changer de forme. */
+const CHEMINS_HORS_CLOUD = [
+  ["config", "_cloud_local"],
+  ["config", "_cloud_version"],
+  ["config", "_cloud_ancre"],
+  ["config", "perimetre_kpi"],
+  ["config", "pole"],
+  ["config", "rapprochement_bancaire", "journal_password"],
+  ["_synchroCloud"],
+];
+
+/* LE FICHIER TÉLÉCHARGÉ RETIRE UN PEU MOINS, et c'est voulu : `perimetre_kpi` et `pole` y
+   restent, parce qu'ils servent à rouvrir le dossier sur un autre poste. C'est une PROJECTION
+   de la liste maîtresse, jamais une seconde liste — deux listes auraient dérivé. */
+const CHEMINS_HORS_FICHIER = CHEMINS_HORS_CLOUD.filter(function(ch){
+  return !(ch.length === 2 && ch[0] === "config" &&
+           (ch[1] === "perimetre_kpi" || ch[1] === "pole"));
+});
+
+/* Les deux constantes historiques, gardées pour les bancs qui les chargent par leur nom, et
+   DÉRIVÉES de la liste maîtresse pour qu'elles ne puissent plus la contredire. Elles sont
+   relatives à `config`, comme avant. */
+const SECRETS_CLOUD_HORS_FICHIER = CHEMINS_HORS_FICHIER
+  .filter(function(ch){ return ch.length === 2 && ch[0] === "config"; })
+  .map(function(ch){ return ch[1]; });
 
 /* SECRETS EN PROFONDEUR — ajouté le 26/09/2026, avec le déchiffrement du journal bancaire.
    Le Directeur Général a décidé ce jour-là que l'application ouvrirait elle-même le journal de
@@ -3542,21 +3615,65 @@ const SECRETS_CLOUD_HORS_FICHIER = ["_cloud_local", "_cloud_version"];
    par quiconque ouvre le fichier.
    Les clés cloud vivent à la racine de `config`, celle-ci vit dans une sous-rubrique : il faut
    donc un second mécanisme, par CHEMIN, et non l'allonger d'une clé de plus. */
-const SECRETS_IMBRIQUES_HORS_FICHIER = [["rapprochement_bancaire", "journal_password"]];
+const SECRETS_IMBRIQUES_HORS_FICHIER = CHEMINS_HORS_FICHIER
+  .filter(function(ch){ return ch.length > 2 && ch[0] === "config"; })
+  .map(function(ch){ return ch.slice(1); });
+
+/* Les deux primitives de chemin. Écrites une fois, employées dans les deux sens : c'est ce
+   qui garantit que « retiré » et « réinjecté » parlent exactement des mêmes champs. */
+function _retirerChemin(objet, chemin){
+  let n = objet;
+  for(let i = 0; i < chemin.length - 1; i++){
+    if(!n || typeof n !== "object") return;
+    n = n[chemin[i]];
+  }
+  if(n && typeof n === "object") delete n[chemin[chemin.length - 1]];
+}
+function _lireChemin(objet, chemin){
+  let n = objet;
+  for(let i = 0; i < chemin.length; i++){
+    if(!n || typeof n !== "object") return undefined;
+    n = n[chemin[i]];
+  }
+  return n;
+}
+/* Repose une valeur locale dans la fiche reçue. NE CRÉE PAS les rubriques intermédiaires quand
+   la valeur est absente : une fiche sans rubrique `rapprochement_bancaire` ne doit pas en gagner
+   une vide, qui ferait ensuite croire à une rubrique renseignée. */
+function _reporterChemin(cible, source, chemin){
+  const v = _lireChemin(source, chemin);
+  if(v === undefined) return;
+  let n = cible;
+  for(let i = 0; i < chemin.length - 1; i++){
+    if(!n || typeof n !== "object") return;
+    if(n[chemin[i]] === null || typeof n[chemin[i]] !== "object") n[chemin[i]] = {};
+    n = n[chemin[i]];
+  }
+  if(n && typeof n === "object") n[chemin[chemin.length - 1]] = v;
+}
+
+/* FICHE PRÊTE À SORTIR VERS LE SERVEUR. Appelée par chiffrerPourCloud(), et par elle seule —
+   voir la note de CHEMINS_HORS_CLOUD sur le pourquoi de cet endroit précis. */
+function officinePourCloud(officine){
+  const copie = JSON.parse(JSON.stringify(officine));
+  CHEMINS_HORS_CLOUD.forEach(function(ch){ _retirerChemin(copie, ch); });
+  return copie;
+}
+
+/* L'INVERSE, ET IL EST OBLIGATOIRE. Une fiche reçue du cloud ne porte AUCUN des champs
+   ci-dessus : l'adopter telle quelle effacerait le mot de passe du journal, le cache de clés de
+   ce poste et le périmètre du pôle. Toute fiche venue du serveur passe par ici avant de toucher
+   `etat.officine`, sans exception — reprise, fusion, arbitrage, bouton « récupérer la copie du
+   cloud ». Invariant : ce qui est retiré est réinjecté, depuis la MÊME constante. */
+function reinjecterLocaux(recue, locale){
+  if(!recue || !locale) return recue;
+  CHEMINS_HORS_CLOUD.forEach(function(ch){ _reporterChemin(recue, locale, ch); });
+  return recue;
+}
 
 function officinePourExport(officine){
   const copie = JSON.parse(JSON.stringify(officine));
-  if(copie && copie.config){
-    SECRETS_CLOUD_HORS_FICHIER.forEach(k=>{ delete copie.config[k]; });
-    SECRETS_IMBRIQUES_HORS_FICHIER.forEach(chemin=>{
-      let n = copie.config;
-      for(let i = 0; i < chemin.length - 1; i++){
-        if(!n || typeof n !== "object") return;
-        n = n[chemin[i]];
-      }
-      if(n && typeof n === "object") delete n[chemin[chemin.length - 1]];
-    });
-  }
+  CHEMINS_HORS_FICHIER.forEach(function(ch){ _retirerChemin(copie, ch); });
   return copie;
 }
 
@@ -3565,6 +3682,786 @@ function officinePourExport(officine){
 function fichePorteMotDePasseJournal(officine){
   const rb = ((officine||{}).config||{}).rapprochement_bancaire;
   return !!(rb && typeof rb === "object" && rb.journal_password);
+}
+
+/* ==========================================================================
+   LA FUSION DE DEUX VERSIONS D'UNE MÊME FICHE — posée le 30/09/2026
+   ==========================================================================
+   POURQUOI ELLE EXISTE. Le Directeur Général a décidé de brancher la synchro cloud sur le pôle
+   Trésorerie, avec « reprise automatique quand rien n'est en jeu, et fusion par mois ×
+   indicateur quand les deux côtés ont travaillé ». Jusqu'ici un conflit se tranchait sur la
+   fiche ENTIÈRE, et le perdant était détruit. Or l'Achat et la Trésorerie écrivent des
+   indicateurs DIFFÉRENTS dans les mêmes mois : trancher « tout ou rien » aurait détruit, à
+   presque chaque passage d'un pôle à l'autre, le travail de l'autre pôle.
+
+   LE PRINCIPE. La fiche est aplatie en FEUILLES — une par (champ, mois, indicateur), une par
+   réglage, une par objectif — et chaque feuille se fusionne À TROIS : la copie de cet appareil,
+   celle du serveur, et l'ANCRE, c'est-à-dire l'empreinte de la fiche à la dernière synchro
+   réussie. L'ancre est ce qui distingue « l'autre a mis à jour » de « nous avons tous les deux
+   écrit » : sans elle, chaque recalcul d'un indicateur par l'autre pôle passerait pour un
+   conflit, et le Gérant apprendrait à cliquer sans lire.
+
+   L'ANCRE NE VOYAGE JAMAIS AVEC UNE AUTRE COPIE QUE CELLE QU'ELLE DÉCRIT. Elle est hors du blob
+   cloud ET hors du fichier téléchargé (voir CHEMINS_HORS_CLOUD). C'est ce qui rend la
+   restauration d'une vieille sauvegarde sans danger : la fiche restaurée arrive SANS ancre, et
+   la synchro demande au lieu de prendre les feuilles plus récentes du serveur pour des feuilles
+   que cet appareil aurait retirées.
+
+   CE QUE LA FUSION NE FAIT JAMAIS :
+     · deviner. Aucun horodatage de la fiche ne départage deux versions — mesuré : `date_analyse`
+       est écrit sous deux formats incomparables, au jour près, et pour le rapprochement
+       bancaire ce n'est même pas la date du calcul. Quand les deux côtés ont écrit la même
+       case, la fusion garde celle de CET appareil — celle qui est à l'écran — et range LES DEUX
+       versions en quarantaine (`_fusion_arbitrages`) jusqu'à ce que le Gérant tranche ;
+     · fusionner un champ dont personne n'a décidé la règle. REGLES_FUSION est écrite à la main ;
+       un champ qui n'y figure pas ARRÊTE la fusion et se fait nommer ;
+     · lever une exception. Elle rend {ok:false, motif} : une fusion qui échoue ne doit jamais
+       emporter avec elle l'enregistrement de la copie locale ;
+     · écrire dans la page. Elle rend un `journal` de {niv, msg} que chaque pôle affiche.
+   ========================================================================== */
+
+/* ---- 1. la forme canonique et l'empreinte ----
+   CANON : JSON aux clés TRIÉES, récursivement. Sans le tri, deux objets égaux écrits dans un
+   ordre d'insertion différent — et cet ordre dépend du pôle qui a calculé — seraient déclarés en
+   conflit alors qu'ils portent le même chiffre : un conflit fabriqué par l'outil. Les tableaux
+   gardent leur ordre, qui a un sens. */
+function canon(x){
+  if(x === null || x === undefined || typeof x !== "object")
+    return JSON.stringify(x === undefined ? null : x);
+  if(Array.isArray(x)) return "[" + x.map(canon).join(",") + "]";
+  const cles = Object.keys(x).filter(function(k){ return x[k] !== undefined; }).sort();
+  return "{" + cles.map(function(k){ return JSON.stringify(k) + ":" + canon(x[k]); }).join(",") + "}";
+}
+/* EMPREINTE — cyrb53, 53 bits, SYNCHRONE. Pas SubtleCrypto, qui est asynchrone : la fusion doit
+   rester une fonction pure qu'on appelle sans attendre. Une collision ferait prendre une
+   modification pour une absence de modification ; sur quelques milliers de feuilles, la
+   probabilité est de l'ordre du milliardième. Assumé. */
+function _hacher(str){
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for(let i = 0, ch; i < str.length; i++){
+    ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16);
+}
+function _empreinte(v){ return _hacher(canon(v)); }
+
+/* ---- 2. la table des règles ----
+   ÉCRITE À LA MAIN, CHAMP PAR CHAMP. `officineVierge()` déclare 12 champs ; la fiche réelle en
+   porte 20 — les autres sont créés à la volée par les pôles. Relevé le 30/09/2026 dans les trois
+   applications, écriture par écriture. Une fusion par parcours générique aurait fusionné en
+   silence des champs dont personne n'a décidé la règle : exactement « traiter un inconnu comme
+   un zéro », que ce projet s'interdit partout. */
+const REGLES_FUSION = {
+  // l'identité : vérifiée AVANT de fusionner, jamais fusionnée
+  id: "identite", version_standard: "identite",
+  // l'étiquette de version imprimée : on garde la plus récente, ce n'est pas une donnée
+  app_version: "etiquette",
+  config: "config",
+  // [mois][indicateur], EN AJOUT OU REMPLACEMENT SEULEMENT. Vérifié le 30/09/2026 dans les
+  // trois pôles : aucune suppression sur ces branches. L'absence d'un côté n'y est donc jamais
+  // un retrait, et l'union y est sans perte.
+  historique_mensuel: "dict2-maj", kpi_summaries_archives: "dict2-maj",
+  livrables_mensuel: "dict2-maj",
+  // [mois][indicateur ou _global] — ET CELUI-LÀ SE SUPPRIME. Vider un commentaire, c'est revenir
+  // à la proposition de l'application, et le code RETIRE la clé (« Vidé = retour à la
+  // proposition »). Traité en ajout seul, un commentaire vidé sur un poste renaîtrait de la
+  // copie de l'autre, et le rapport imprimerait un texte que le DG a retiré.
+  commentaires_dg: "dict2-suppr",
+  // le mot du mois : fusionné CHAMP PAR CHAMP (titre, mot, verdict)
+  commentaires_mensuels: "note",
+  // les objectifs : « Retirer » existe, la suppression est réelle
+  objectifs_mensuels: "objectifs",
+  // les pièces reconnues : un ENSEMBLE cumulatif — le code construit déjà un Set
+  pieces_vues_mensuel: "ensemble",
+  // les pièces incomplètes : REMPLACÉES à chaque dépôt. Voir _resoudrePessimiste
+  pieces_partielles_mensuel: "pessimiste",
+  historiques_importes: "dict1-maj", equivalences: "dict1-maj",
+  contrats_objectifs: "liste-id",
+  journal_analyses: "journal",
+  // la quarantaine VOYAGE : tous les postes voient le même arbitrage en attente, et n'importe
+  // lequel peut trancher. Trancher, c'est retirer l'entrée — elle est donc supprimable.
+  _fusion_arbitrages: "arbitrages",
+  // la comptabilité du bandeau décrit L'APPAREIL, pas l'officine : jamais fusionnée, et hors
+  // de l'empreinte — sinon chaque enregistrement ressemblerait à une modification.
+  derniere_sauvegarde: "local", derniere_sauvegarde_source: "local",
+  nb_analyses_non_sauvegardees: "local", _synchroCloud: "local",
+};
+/* Un conflit sur un indicateur se tranche POUR LES TROIS BRANCHES À LA FOIS : le chiffre, son
+   archive et la charge de son document. Sinon la fusion pourrait accoler au chiffre de cet
+   appareil le document calculé par l'autre — un livrable qui ne dit pas le chiffre affiché. */
+const GROUPE_INDICATEUR = ["historique_mensuel", "kpi_summaries_archives", "livrables_mensuel"];
+const REGLES_PAR_MOIS = ["dict2-maj", "dict2-suppr", "note", "objectifs", "ensemble", "pessimiste"];
+
+/* Les réglages. DÉRIVÉS de la liste maîtresse de ce qui ne quitte pas l'appareil : une seconde
+   liste aurait fini par la contredire. */
+const CONFIG_LOCAUX = CHEMINS_HORS_CLOUD
+  .filter(function(ch){ return ch.length === 2 && ch[0] === "config"; })
+  .map(function(ch){ return ch[1]; });
+const CONFIG_IMBRIQUES_LOCAUX = CHEMINS_HORS_CLOUD
+  .filter(function(ch){ return ch.length === 3 && ch[0] === "config"; })
+  .map(function(ch){ return ch[1] + "." + ch[2]; });
+/* Le handle et les sels désignent L'ENREGISTREMENT SERVEUR : jamais fusionnés, et une
+   divergence arrête tout (deux copies qui ne parlent pas du même compte cloud). */
+const CONFIG_IDENTIQUES = ["cloud_handle", "cloud_auth_salt", "cloud_enc_salt", "cloud_iterations"];
+/* Les rubriques de réglages fusionnées CLÉ PAR CLÉ. Elles portent aussi une feuille pour
+   elles-mêmes : la Trésorerie retire la rubrique `bfr` entière quand le délai est effacé. */
+const CONFIG_SOUS_OBJETS = ["seuils_specifiques", "mapping_poles", "familles_parametrage",
+  "workflow_ecarts", "equipe_fonctions", "ecart_caisse", "versements", "bfr",
+  "rapprochement_bancaire"];
+const CHAMPS_NOTE_FUSION = ["titre", "mot", "verdict"];
+const SEP = "\u001f";       // séparateur des parties d'une clé de feuille : absent de tout nom réel
+
+/* Le mot du mois a deux formes : l'objet {titre, mot, verdict}, et la chaîne nue d'avant, que
+   noteDuMois() relit encore. On normalise EXACTEMENT comme elle. */
+function _normaliserNote(v){
+  if(typeof v === "string") return { titre:"", mot:v, verdict:"" };
+  const o = (v && typeof v === "object") ? v : {};
+  return { titre: o.titre == null ? "" : String(o.titre),
+           mot: o.mot == null ? "" : String(o.mot),
+           verdict: o.verdict == null ? "" : String(o.verdict) };
+}
+/* LES OBJECTIFS N'ONT PAS D'IDENTIFIANT et l'interface les désigne par leur RANG. On dérive une
+   clé de leur contenu. Limite connue, portée au DG : renommer un constat le fait disparaître et
+   réapparaître comme neuf. Le correctif de fond est de leur donner un `id`. */
+function _cleObjectif(o){
+  if(!o || typeof o !== "object") return "?" + _empreinte(o);
+  if(o.type === "constat") return "c|" + U.normLibre(String(o.libelle || ""));
+  return "m|" + [o.kpi_id, o.indicateur, o.operateur, o.cible].map(function(x){
+    return x == null ? "" : String(x); }).join("|");
+}
+function _cleContrat(c){
+  return (c && c.id != null) ? "id|" + String(c.id) : "h|" + _empreinte(c);
+}
+/* Deux éléments identiques dans une même liste ne doivent pas se fondre en un : le second
+   reçoit « #2 », le troisième « #3 ». Déterministe, puisque l'ordre de la liste l'est. */
+function _clesUniques(liste, fnCle){
+  const vus = {};
+  return liste.map(function(it){
+    const c = fnCle(it);
+    vus[c] = (vus[c] || 0) + 1;
+    return vus[c] === 1 ? c : c + "#" + vus[c];
+  });
+}
+const _estDict = function(v){ return !!v && typeof v === "object" && !Array.isArray(v); };
+
+/* ---- 3. aplatir une fiche en feuilles ----
+   Rend { feuilles: Map(clé → {champ, parties, politique, valeur}), inconnus, ordres, mois }.
+   `ordres` garde l'ordre des listes (objectifs, contrats, journal) pour les reconstruire sans
+   les mélanger ; `mois` garde les mois présents, même vides. Une forme inattendue n'est JAMAIS
+   sautée : sautée, elle disparaîtrait de la fiche reconstruite. Elle est nommée, et arrête. */
+function _feuilles(o){
+  const feuilles = new Map(), inconnus = [], ordres = {}, mois = {};
+  const pose = function(champ, parties, politique, valeur){
+    feuilles.set([champ].concat(parties).join(SEP),
+                 { champ:champ, parties:parties, politique:politique, valeur:valeur });
+  };
+  const ordre = function(nom, cle){ (ordres[nom] = ordres[nom] || []).push(cle); };
+  const unMois = function(champ, p){ (mois[champ] = mois[champ] || new Set()).add(p); };
+  const forme = function(nom){ inconnus.push(nom + " (forme inattendue)"); };
+  for(const champ of Object.keys(o || {})){
+    const regle = REGLES_FUSION[champ];
+    if(regle === undefined){ inconnus.push(champ); continue; }
+    const v = o[champ];
+    if(v === null || v === undefined) continue;
+    if(regle === "identite" || regle === "etiquette" || regle === "local") continue;
+    const liste = (regle === "liste-id" || regle === "journal");
+    if(liste ? !Array.isArray(v) : !_estDict(v)){ forme(champ); continue; }
+    switch(regle){
+      case "config": _feuillesConfig(v, pose, forme); break;
+      case "dict2-maj": case "dict2-suppr":
+        for(const p of Object.keys(v)){
+          if(!_estDict(v[p])){ forme(champ + "[" + p + "]"); continue; }
+          unMois(champ, p);
+          for(const k of Object.keys(v[p]))
+            pose(champ, [p, k], regle === "dict2-suppr" ? "suppr" : "maj", v[p][k]);
+        }
+        break;
+      case "dict1-maj": for(const k of Object.keys(v)) pose(champ, [k], "maj", v[k]); break;
+      case "arbitrages": for(const k of Object.keys(v)) pose(champ, [k], "arbitrage", v[k]); break;
+      case "note":
+        for(const p of Object.keys(v)){
+          if(typeof v[p] !== "string" && !_estDict(v[p])){ forme(champ + "[" + p + "]"); continue; }
+          unMois(champ, p);
+          const n = _normaliserNote(v[p]);
+          for(const f of CHAMPS_NOTE_FUSION) pose(champ, [p, f], "note", n[f]);
+        }
+        break;
+      case "objectifs":
+        for(const p of Object.keys(v)){
+          if(!Array.isArray(v[p])){ forme(champ + "[" + p + "]"); continue; }
+          unMois(champ, p);
+          const cles = _clesUniques(v[p], _cleObjectif);
+          v[p].forEach(function(ob, i){ pose(champ, [p, cles[i]], "suppr", ob); ordre(champ + SEP + p, cles[i]); });
+        }
+        break;
+      case "ensemble":
+        for(const p of Object.keys(v)){
+          if(!Array.isArray(v[p])){ forme(champ + "[" + p + "]"); continue; }
+          unMois(champ, p);
+          for(const ref of v[p]) pose(champ, [p, String(ref)], "maj", true);
+        }
+        break;
+      case "pessimiste": for(const p of Object.keys(v)) pose(champ, [p], "pessimiste", v[p]); break;
+      case "liste-id": case "journal": {
+        const cles = _clesUniques(v, regle === "liste-id" ? _cleContrat : _empreinte);
+        v.forEach(function(it, i){
+          pose(champ, [cles[i]], regle === "liste-id" ? "suppr" : "maj", it);
+          ordre(champ, cles[i]);
+        });
+        break;
+      }
+    }
+  }
+  return { feuilles:feuilles, inconnus:inconnus, ordres:ordres, mois:mois };
+}
+function _feuillesConfig(cfg, pose, forme){
+  for(const k of Object.keys(cfg)){
+    if(CONFIG_LOCAUX.indexOf(k) >= 0) continue;          // ne quitte pas l'appareil
+    if(CONFIG_IDENTIQUES.indexOf(k) >= 0) continue;      // vérifiés à part, jamais fusionnés
+    const v = cfg[k];
+    if(k === "synchro_cloud_active"){ pose("config", [k], "cfg-ou", !!v); continue; }
+    if(CONFIG_SOUS_OBJETS.indexOf(k) >= 0){
+      if(!_estDict(v)){ forme("config." + k); continue; }
+      pose("config", [k], "cfg-suppr", true);            // la rubrique elle-même
+      for(const sk of Object.keys(v)){
+        if(CONFIG_IMBRIQUES_LOCAUX.indexOf(k + "." + sk) >= 0) continue;
+        pose("config", [k, sk], "cfg-suppr", v[sk]);
+      }
+      continue;
+    }
+    pose("config", [k], "cfg-suppr", v);                 // tout autre réglage : une valeur opaque
+  }
+}
+
+/* ---- 4. l'empreinte d'une fiche, et l'ancre ---- */
+function empreinteFusionnable(o){
+  const feuilles = {};
+  for(const [cle, fe] of _feuilles(o).feuilles) feuilles[cle] = _empreinte(fe.valeur);
+  const tri = Object.keys(feuilles).sort().map(function(c){ return c + "=" + feuilles[c]; });
+  return { globale: _hacher(tri.join("\n")), feuilles: feuilles };
+}
+/* L'ANCRE : l'état de la fiche au moment d'une synchro RÉUSSIE, à la version `version` du
+   serveur. Gardée dans `config._cloud_ancre`, sur cet appareil seulement. Le serveur ne garde
+   que le dernier blob, sans historique : aucun ancêtre commun ne se récupère de là-bas. */
+function ancreDepuis(o, version){
+  const e = empreinteFusionnable(o);
+  return { version: Number(version) || 0, globale: e.globale, feuilles: e.feuilles };
+}
+
+/* ---- 5. la décision : que faire à la prochaine synchro ?
+   → "hors-synchro" | "rien-a-faire" | "reprise" | "poussee" | "fusion" | "demander".
+   LE SIGNAL N'EST PAS LE COMPTEUR « analyses non sauvegardées ». Mesuré le 30/09/2026 : il est
+   remis à zéro par le simple téléchargement de la sauvegarde, et il ne compte que les DÉPÔTS —
+   le mot du mois, les objectifs, les réglages ne l'incrémentent pas. Il peut valoir 0 alors que
+   toute la note du mois n'est pas partie. Le signal est l'EMPREINTE DU CONTENU, contre l'ancre.
+
+   « reprise » et « fusion » s'exécutent par la MÊME fonction, fusionnerOfficines. Quand la
+   copie locale n'a pas bougé depuis l'ancre, la fusion à trois voies rend, feuille par feuille,
+   ce que le serveur porte — c'est une reprise — tout en gardant ce qu'une branche en ajout seul
+   ne peut pas avoir perdu. Une reprise par simple remplacement n'aurait pas cette garantie. */
+function decisionSynchro(o, versionDistante){
+  if(!o || !o.config || !o.config.synchro_cloud_active) return "hors-synchro";
+  const ancre = o.config._cloud_ancre;
+  const vLocale = Number(o.config._cloud_version) || 0;
+  const vDist = Number(versionDistante) || 0;
+  /* SANS ANCRE VALABLE (première synchro de cet appareil, fiche restaurée d'un fichier, ancre
+     d'une autre version) : on ne sait pas ce qui a bougé ici. Si le serveur n'a pas bougé non
+     plus depuis ce que ce poste connaît, pousser ne peut rien y écraser. Sinon, on demande. */
+  if(!ancre || !ancre.feuilles || Number(ancre.version) !== vLocale){
+    return vDist === vLocale ? "poussee" : "demander";
+  }
+  const localeABouge = empreinteFusionnable(o).globale !== ancre.globale;
+  const distanteABouge = vDist !== vLocale;
+  if(!localeABouge && !distanteABouge) return "rien-a-faire";
+  if(!localeABouge) return "reprise";                    // rien de local en jeu : c'est PROUVÉ
+  if(!distanteABouge) return "poussee";
+  return "fusion";
+}
+
+/* ---- 6. une feuille, à trois voies ----
+   L, R : {present, valeur, h} ; A : empreinte de la feuille dans l'ancre, undefined si elle n'y
+   était pas. `supprimable` est faux sur les branches en ajout seul, où une absence n'est jamais
+   un retrait. */
+function _troisVoies(L, R, A, supprimable){
+  if(!L.present && !R.present) return { absent:true };
+  if(L.present && R.present && L.h === R.h) return { valeur:L.valeur };
+  if(L.present && !R.present){
+    if(A === undefined || !supprimable) return { valeur:L.valeur };
+    if(L.h === A) return { absent:true, evenement:"suppression-distante" };
+    return { conflit:true };                       // retirée là-bas, modifiée ici
+  }
+  if(!L.present && R.present){
+    if(A === undefined || !supprimable) return { valeur:R.valeur, evenement:"ajout-distant" };
+    if(R.h === A) return { absent:true };          // retirée ici, intacte là-bas
+    return { conflit:true };                       // retirée ici, modifiée là-bas
+  }
+  if(A !== undefined && L.h === A) return { valeur:R.valeur, evenement:"maj-distante" };
+  if(A !== undefined && R.h === A) return { valeur:L.valeur };
+  return { conflit:true };
+}
+
+/* LES PIÈCES INCOMPLÈTES : quand les deux copies diffèrent, on garde celle qui SIGNALE LE PLUS
+   DE PIÈCES MANQUANTES. Une erreur pessimiste fait redéposer un fichier pour rien ; une erreur
+   optimiste publie un indicateur sur un mois incomplet EN LE DISANT COMPLET. Le champ est de
+   toute façon reconstruit au prochain dépôt. */
+function _resoudrePessimiste(L, R){
+  const nb = function(x){ return (x && typeof x === "object") ? Object.keys(x).length : 0; };
+  return nb(R.valeur) > nb(L.valeur) ? R.valeur : L.valeur;
+}
+
+/* ---- 7. LA FUSION ----
+   fusionnerOfficines(locale, distante, opts) — l'ancre est lue dans `locale.config._cloud_ancre` :
+   elle appartient à cet appareil, on ne la passe pas à part pour ne jamais pouvoir se tromper
+   de fiche.
+     opts.vuLe            : date serveur de la copie distante, rangée avec chaque arbitrage
+     opts.versionServeur  : sa version
+     opts.toutGarderSansAncre : voir plus bas — seulement sur décision explicite du Gérant
+   → { ok:true, officine, journal, arbitrages, bilan }
+     { ok:false, bloquant:true, motif, champs, journal }   on s'arrête et on demande
+     { ok:false, motif, journal }                          erreur inattendue — jamais levée
+   LA FICHE RENDUE PART DE LA COPIE LOCALE, dont seules les feuilles sont remplacées : ce qui ne
+   quitte pas l'appareil (clés, mot de passe du journal, périmètre du pôle) y reste tel quel. */
+function fusionnerOfficines(locale, distante, opts){
+  opts = opts || {};
+  const journal = [];
+  const bloque = function(motif, champs){
+    journal.push({ niv:"err", msg:"Synchro : fusion ARRÊTÉE — " + motif +
+                   (champs && champs.length ? " (" + champs.join(", ") + ")" : "") +
+                   ". Rien n'a été modifié, ni ici ni sur le serveur." });
+    return { ok:false, bloquant:true, motif:motif, champs:champs || [], journal:journal };
+  };
+  try{
+    if(!locale || !_estDict(locale.config) || !distante || !_estDict(distante.config))
+      return bloque("l'une des deux copies n'est pas une fiche d'officine");
+    if(locale.id && distante.id && String(locale.id) !== String(distante.id))
+      return bloque("ce ne sont pas deux versions d'une même fiche, mais deux officines différentes", ["id"]);
+    if(compareVersions(distante.version_standard, SCHEMA_VERSION) > 0)
+      return bloque("la copie du serveur est écrite dans un format plus récent que cette " +
+                    "application — la fusionner perdrait ce qu'elle contient de nouveau",
+                    ["version_standard"]);
+    const diverge = CONFIG_IDENTIQUES.filter(function(k){
+      const a = locale.config[k], b = distante.config[k];
+      return a != null && b != null && canon(a) !== canon(b);
+    });
+    if(diverge.length) return bloque("les deux copies ne désignent pas le même compte cloud", diverge);
+
+    const FL = _feuilles(locale), FR = _feuilles(distante);
+    const inconnus = FL.inconnus.concat(FR.inconnus.filter(function(x){ return FL.inconnus.indexOf(x) < 0; }));
+    if(inconnus.length)
+      return bloque("champ absent de la table des règles de fusion, ou de forme inattendue — " +
+                    "personne n'a décidé comment il se fusionne, et la fusion ne devine pas", inconnus);
+
+    const ancre = locale.config._cloud_ancre;
+    const sansAncre = !(ancre && _estDict(ancre.feuilles));
+    const A = sansAncre ? {} : ancre.feuilles;
+
+    /* PREMIER PASSAGE : décider chaque feuille, sans rien poser encore. */
+    const decisions = [];
+    const cles = new Set(Array.from(FL.feuilles.keys()).concat(Array.from(FR.feuilles.keys())));
+    for(const cle of cles){
+      const fl = FL.feuilles.get(cle), fr = FR.feuilles.get(cle), ref = fl || fr;
+      const L = { present:!!fl, valeur:fl && fl.valeur, h:fl && _empreinte(fl.valeur) };
+      const R = { present:!!fr, valeur:fr && fr.valeur, h:fr && _empreinte(fr.valeur) };
+      const pol = ref.politique;
+      let r;
+      if(pol === "cfg-ou") r = { valeur: !!(L.valeur || R.valeur) };
+      else if(pol === "pessimiste"){
+        r = (L.present && R.present && L.h !== R.h) ? { valeur:_resoudrePessimiste(L, R), pessimiste:true }
+          : L.present ? { valeur:L.valeur } : { valeur:R.valeur, evenement:"ajout-distant" };
+      } else {
+        const supprimable = (pol === "suppr" || pol === "cfg-suppr" || pol === "arbitrage");
+        r = _troisVoies(L, R, A[cle], supprimable);
+        /* SANS ANCRE, un objectif, un contrat ou un commentaire présent d'un seul côté est
+           AMBIGU : ajouté là, ou retiré ici ? La fusion ne tranche pas seule. */
+        if(sansAncre && pol === "suppr" && L.present !== R.present) r.ambigu = true;
+        /* LE MOT DU MOIS, SANS POINT DE COMPARAISON (trouvé le 01/10/2026 en reliant une
+           Trésorerie dans un navigateur) : ses trois champs existent toujours, vides ou non.
+           Un champ VIDE d'un côté et rempli de l'autre, c'est la même ambiguïté qu'un objectif
+           présent d'un seul côté — jamais écrit ici, ou effacé ici ? Traité en conflit, le titre
+           écrit dans l'Achat disparaissait de l'écran au profit du champ vide de la Trésorerie.
+           On le traite donc en AMBIGU : la fusion s'arrête, sauf « Réunir » — qui garde le texte. */
+        if(sansAncre && pol === "note" && r.conflit && (L.valeur === "" || R.valeur === ""))
+          r = L.valeur === "" ? { valeur:R.valeur, evenement:"ajout-distant", ambigu:true }
+                              : { valeur:L.valeur, ambigu:true };
+        /* Une quarantaine ne se perd jamais : deux versions d'un même arbitrage, on garde celle
+           qui existe, de préférence celle d'ici — pas d'arbitrage sur un arbitrage. */
+        if(r.conflit && pol === "arbitrage") r = { valeur: L.present ? L.valeur : R.valeur };
+      }
+      decisions.push({ cle:cle, fl:fl, fr:fr, ref:ref, r:r });
+    }
+
+    const ambigus = decisions.filter(function(d){ return d.r.ambigu; });
+    if(ambigus.length && !opts.toutGarderSansAncre)
+      return bloque("cet appareil n'a pas encore de point de comparaison avec le serveur, et " +
+                    "des éléments ne sont présents que d'un côté : ajoutés là-bas, ou retirés " +
+                    "ici ? La fusion ne le devine pas. « Tout garder » ne perd rien, mais un " +
+                    "élément retiré peut réapparaître", _resumerParMois(ambigus));
+
+    /* LES UNITÉS « INDICATEUR » EN CONFLIT : une seule des trois branches suffit. */
+    const unites = new Map();
+    for(const d of decisions){
+      if(d.r.conflit && GROUPE_INDICATEUR.indexOf(d.ref.champ) >= 0)
+        unites.set(d.ref.parties[0] + SEP + d.ref.parties[1],
+                   { periode:d.ref.parties[0], kpi_id:d.ref.parties[1] });
+    }
+
+    /* SECOND PASSAGE : poser. */
+    const retenues = new Map(), arbitrages = {};
+    const bilan = { ajouts:{}, majs:{}, suppressions:0, conflits:0, reglages:[],
+                    pessimistes:0, gardesSansAncre:ambigus.length };
+    for(const d of decisions){
+      const ref = d.ref, r = d.r;
+      if(GROUPE_INDICATEUR.indexOf(ref.champ) >= 0 && unites.has(ref.parties[0] + SEP + ref.parties[1])){
+        if(d.fl) retenues.set(d.cle, d.fl);                  // strictement la version d'ici
+        continue;
+      }
+      if(r.conflit){
+        if(d.fl) retenues.set(d.cle, d.fl);                  // on garde ce qui est À L'ÉCRAN
+        if(ref.politique.indexOf("cfg-") === 0) bilan.reglages.push(ref.parties.join("."));
+        else {
+          arbitrages[d.cle] = { type:"feuille", champ:ref.champ, parties:ref.parties,
+            periode: REGLES_PAR_MOIS.indexOf(REGLES_FUSION[ref.champ]) >= 0 ? ref.parties[0] : null,
+            cet_appareil: d.fl ? d.fl.valeur : null, le_serveur: d.fr ? d.fr.valeur : null,
+            vu_le: opts.vuLe || null, version_serveur: opts.versionServeur == null ? null : opts.versionServeur };
+          bilan.conflits++;
+        }
+        continue;
+      }
+      if(r.absent){ if(r.evenement === "suppression-distante") bilan.suppressions++; continue; }
+      retenues.set(d.cle, (d.fl && r.valeur === d.fl.valeur) ? d.fl : Object.assign({}, ref, { valeur:r.valeur }));
+      if(r.pessimiste) bilan.pessimistes++;
+      if(r.evenement === "ajout-distant" || r.evenement === "maj-distante"){
+        const g = ref.champ + (REGLES_PAR_MOIS.indexOf(REGLES_FUSION[ref.champ]) >= 0 ? SEP + ref.parties[0] : "");
+        const cible = r.evenement === "ajout-distant" ? bilan.ajouts : bilan.majs;
+        cible[g] = (cible[g] || 0) + 1;
+      }
+    }
+    for(const [u, info] of unites){
+      const trois = function(F){
+        const o = {};
+        for(const champ of GROUPE_INDICATEUR){
+          const f = F.feuilles.get(champ + SEP + info.periode + SEP + info.kpi_id);
+          o[champ] = f ? f.valeur : null;
+        }
+        return o;
+      };
+      arbitrages["indicateur" + SEP + u] = { type:"indicateur", periode:info.periode, kpi_id:info.kpi_id,
+        cet_appareil:trois(FL), le_serveur:trois(FR),
+        vu_le: opts.vuLe || null, version_serveur: opts.versionServeur == null ? null : opts.versionServeur };
+      bilan.conflits++;
+    }
+
+    const sortie = _reconstruire(locale, retenues, FL, FR);
+    if(Object.keys(arbitrages).length)
+      sortie._fusion_arbitrages = Object.assign({}, sortie._fusion_arbitrages || {}, arbitrages);
+    if(compareVersions(distante.app_version, locale.app_version) > 0) sortie.app_version = distante.app_version;
+    _reaffirmerArchives(sortie, journal);
+    _journaliserBilan(bilan, journal);
+    return { ok:true, officine:sortie, journal:journal,
+             arbitrages:Object.keys(sortie._fusion_arbitrages || {}).length, bilan:bilan };
+  }catch(e){
+    journal.push({ niv:"err", msg:"Synchro : la fusion a échoué de façon inattendue (" +
+                   ((e && e.message) || e) + "). Rien n'a été modifié." });
+    return { ok:false, motif:String((e && e.message) || e), journal:journal };
+  }
+}
+
+function _resumerParMois(decisions){
+  const n = {};
+  for(const d of decisions){
+    const r = d.ref, parMois = REGLES_PAR_MOIS.indexOf(REGLES_FUSION[r.champ]) >= 0;
+    const g = _libelleChamp(r.champ) + (parMois ? " " + r.parties[0] : "");
+    n[g] = (n[g] || 0) + 1;
+  }
+  return Object.keys(n).map(function(g){ return g + " × " + n[g]; });
+}
+
+/* Reconstruit, sur une COPIE de la fiche locale, chaque champ rencontré d'un côté ou de l'autre :
+   il est vidé puis rempli des seules feuilles retenues — c'est ce qui fait qu'une feuille
+   retirée disparaît vraiment au lieu de survivre dans la copie de départ. */
+function _reconstruire(locale, retenues, FL, FR){
+  const o = JSON.parse(JSON.stringify(locale));
+  const cfg = o.config;
+  const champs = new Set();
+  for(const F of [FL, FR]){
+    for(const f of F.feuilles.values()) champs.add(f.champ);
+    for(const c of Object.keys(F.mois)) champs.add(c);
+  }
+  for(const champ of champs){
+    if(champ === "config") continue;
+    const regle = REGLES_FUSION[champ];
+    o[champ] = (regle === "liste-id" || regle === "journal") ? [] : {};
+  }
+  /* Réglages : on retire les feuilles d'ici, puis on pose les retenues. Ce qui n'est pas une
+     feuille (clés de l'appareil, sels, handle, mot de passe du journal) n'est jamais touché. */
+  for(const f of FL.feuilles.values()){
+    if(f.champ !== "config") continue;
+    const k = f.parties[0];
+    if(f.parties.length === 2){ if(_estDict(cfg[k])) delete cfg[k][f.parties[1]]; }
+    else if(CONFIG_SOUS_OBJETS.indexOf(k) < 0) delete cfg[k];
+  }
+  const rubriquesRetenues = new Set(), tampons = {};
+  for(const f of retenues.values()){
+    const p = f.parties;
+    switch(REGLES_FUSION[f.champ]){
+      case "config":
+        if(p.length === 2 || CONFIG_SOUS_OBJETS.indexOf(p[0]) >= 0){
+          if(!_estDict(cfg[p[0]])) cfg[p[0]] = {};
+          rubriquesRetenues.add(p[0]);
+          if(p.length === 2) cfg[p[0]][p[1]] = f.valeur;
+        } else cfg[p[0]] = f.valeur;
+        break;
+      case "dict2-maj": case "dict2-suppr":
+        (o[f.champ][p[0]] = o[f.champ][p[0]] || {})[p[1]] = f.valeur; break;
+      case "dict1-maj": case "arbitrages": o[f.champ][p[0]] = f.valeur; break;
+      case "note":
+        (o[f.champ][p[0]] = o[f.champ][p[0]] || { titre:"", mot:"", verdict:"" })[p[1]] = f.valeur; break;
+      case "ensemble": (o[f.champ][p[0]] = o[f.champ][p[0]] || []).push(p[1]); break;
+      case "pessimiste": o[f.champ][p[0]] = f.valeur; break;
+      case "objectifs": {
+        const nom = f.champ + SEP + p[0];
+        (tampons[nom] = tampons[nom] || {})[p[1]] = f.valeur; break;
+      }
+      case "liste-id": case "journal":
+        (tampons[f.champ] = tampons[f.champ] || {})[p[0]] = f.valeur; break;
+    }
+  }
+  /* Une rubrique de réglages dont aucune feuille n'est retenue a été retirée : on la retire,
+     sauf s'il y reste ce qui appartient à cet appareil seul. */
+  for(const k of CONFIG_SOUS_OBJETS){
+    if(!rubriquesRetenues.has(k) && _estDict(cfg[k]) && !Object.keys(cfg[k]).length) delete cfg[k];
+  }
+  /* L'ORDRE DES LISTES EST CELUI DE CET APPAREIL, puis les ajouts dans l'ordre du serveur.
+     L'interface désigne les objectifs par leur RANG : un ordre mélangé ferait retirer le mauvais
+     au prochain clic. */
+  for(const nom of Object.keys(tampons)){
+    const vals = tampons[nom];
+    const ordre = (FL.ordres[nom] || []).concat(FR.ordres[nom] || []);
+    const vus = new Set(), liste = [];
+    for(const c of ordre){
+      if(!vus.has(c) && Object.prototype.hasOwnProperty.call(vals, c)){ vus.add(c); liste.push(vals[c]); }
+    }
+    const parties = nom.split(SEP);
+    if(parties.length === 2) o[parties[0]][parties[1]] = liste; else o[parties[0]] = liste;
+  }
+  /* Les mois présents d'un côté ou de l'autre restent présents, même vides : un mois déposé
+     sans pièce reconnue n'est pas un mois jamais déposé. */
+  for(const F of [FL, FR]){
+    for(const champ of Object.keys(F.mois)){
+      const regle = REGLES_FUSION[champ];
+      for(const p of F.mois[champ]){
+        if(o[champ][p] === undefined)
+          o[champ][p] = (regle === "objectifs" || regle === "ensemble") ? [] : {};
+      }
+    }
+  }
+  for(const champ of champs)
+    if(REGLES_FUSION[champ] === "ensemble") for(const p of Object.keys(o[champ])) o[champ][p].sort();
+  return o;
+}
+
+/* `kpi_summaries_archives` doit contenir tout `historique_mensuel` : upsertPeriode() écrit les
+   deux ensemble. On ré-affirme l'invariant, et on le DIT : un écart est un signe de corruption,
+   et le taire serait perdre le seul témoin qu'on ait. */
+function _reaffirmerArchives(o, journal){
+  const h = o.historique_mensuel || {};
+  const a = (o.kpi_summaries_archives = o.kpi_summaries_archives || {});
+  let n = 0;
+  for(const p of Object.keys(h)) for(const k of Object.keys(h[p] || {})){
+    if(!a[p] || a[p][k] === undefined){ (a[p] = a[p] || {})[k] = h[p][k]; n++; }
+  }
+  if(n) journal.push({ niv:"warn", msg:"Synchro : " + n + " indicateur(s) présent(s) dans " +
+    "l'historique mais absent(s) des archives ont été recopiés. Les deux vont toujours " +
+    "ensemble : leur écart est un signe à surveiller." });
+}
+
+function _libelleChamp(champ){
+  return ({ historique_mensuel:"indicateurs", kpi_summaries_archives:"archives",
+    livrables_mensuel:"documents", commentaires_mensuels:"mot du mois",
+    objectifs_mensuels:"objectifs", pieces_vues_mensuel:"pièces reconnues",
+    pieces_partielles_mensuel:"pièces incomplètes", commentaires_dg:"commentaires",
+    config:"réglages", contrats_objectifs:"contrats", equivalences:"équivalences",
+    historiques_importes:"historiques importés", journal_analyses:"journal",
+    _fusion_arbitrages:"arbitrages en attente" })[champ] || champ;
+}
+function _journaliserBilan(b, journal){
+  const resume = function(dict, verbe){
+    const lignes = Object.keys(dict).filter(function(g){
+      return g.split(SEP)[0] !== "kpi_summaries_archives"; })
+      .map(function(g){ const p = g.split(SEP);
+        return _libelleChamp(p[0]) + (p[1] ? " " + p[1] : "") + " × " + dict[g]; });
+    if(lignes.length) journal.push({ niv:"info", msg:"Synchro : " + verbe + " depuis le serveur — " +
+      lignes.join(" · ") + "." });
+  };
+  resume(b.ajouts, "arrivé");
+  resume(b.majs, "mis à jour");
+  if(b.suppressions) journal.push({ niv:"info", msg:"Synchro : " + b.suppressions +
+    " élément(s) retiré(s) sur un autre appareil l'ont été ici aussi." });
+  if(b.gardesSansAncre) journal.push({ niv:"warn", msg:"Synchro : " + b.gardesSansAncre +
+    " élément(s) présent(s) d'un seul côté ont été GARDÉS, à votre demande. Sans point de " +
+    "comparaison, l'application ne sait pas si l'autre côté les avait retirés : vérifier les " +
+    "objectifs, les commentaires et le mot du mois des mois concernés." });
+  if(b.pessimistes) journal.push({ niv:"warn", msg:"Synchro : pour " + b.pessimistes + " mois, " +
+    "les deux copies ne signalaient pas les mêmes pièces incomplètes — la liste la plus longue " +
+    "est gardée. Mieux vaut redéposer une pièce pour rien que publier un mois incomplet en le " +
+    "disant complet." });
+  if(b.reglages.length) journal.push({ niv:"warn", msg:"Synchro : réglage(s) modifié(s) des deux " +
+    "côtés, la valeur de CET appareil est conservée — " + b.reglages.join(", ") +
+    ". Vérifier qu'elle est bien celle que vous voulez." });
+  if(b.conflits) journal.push({ niv:"err", msg:"Synchro : " + b.conflits + " élément(s) écrit(s) " +
+    "différemment sur les deux appareils. La version de CET appareil reste à l'écran ; les DEUX " +
+    "versions sont conservées et attendent votre arbitrage. Rien n'est perdu." });
+}
+
+/* ---- 8. la quarantaine ---- */
+function arbitragesEnAttente(o){
+  const a = (o && o._fusion_arbitrages) || {};
+  return Object.keys(a).map(function(cle){ return Object.assign({ cle:cle }, a[cle]); });
+}
+/* Le nombre d'arbitrages en attente POUR UN MOIS — que la note imprimée de ce mois doit porter
+   dans son bloc de confiance : un cabinet ne remet pas une note tirée d'un mois dont deux
+   versions s'affrontent sans l'écrire. */
+function arbitragesDuMois(o, periode){
+  return arbitragesEnAttente(o).filter(function(a){ return a.periode === periode; }).length;
+}
+
+/* Pose une valeur à l'emplacement d'une feuille — l'inverse de _feuilles, pour une seule.
+   `valeur` null ou undefined : la feuille est retirée. */
+function _poserDansListe(liste, cles, cle, valeur){
+  const i = cles.indexOf(cle);
+  if(valeur === null || valeur === undefined){ if(i >= 0) liste.splice(i, 1); }
+  else if(i >= 0) liste[i] = valeur;
+  else liste.push(valeur);
+}
+function _poserFeuille(o, champ, parties, valeur){
+  const absent = (valeur === null || valeur === undefined);
+  switch(REGLES_FUSION[champ]){
+    case "dict2-maj": case "dict2-suppr": {
+      if(!_estDict(o[champ])) o[champ] = {};
+      const m = _estDict(o[champ][parties[0]]) ? o[champ][parties[0]] : (o[champ][parties[0]] = {});
+      if(absent) delete m[parties[1]]; else m[parties[1]] = valeur;
+      return true;
+    }
+    case "dict1-maj":
+      if(!_estDict(o[champ])) o[champ] = {};
+      if(absent) delete o[champ][parties[0]]; else o[champ][parties[0]] = valeur;
+      return true;
+    case "note": {
+      if(!_estDict(o[champ])) o[champ] = {};
+      const n = _normaliserNote(o[champ][parties[0]]);
+      n[parties[1]] = absent ? "" : String(valeur);
+      o[champ][parties[0]] = n;
+      return true;
+    }
+    case "objectifs": {
+      if(!_estDict(o[champ])) o[champ] = {};
+      const l = Array.isArray(o[champ][parties[0]]) ? o[champ][parties[0]] : [];
+      _poserDansListe(l, _clesUniques(l, _cleObjectif), parties[1], valeur);
+      o[champ][parties[0]] = l;
+      return true;
+    }
+    case "liste-id": {
+      const l = Array.isArray(o[champ]) ? o[champ] : [];
+      _poserDansListe(l, _clesUniques(l, _cleContrat), parties[0], valeur);
+      o[champ] = l;
+      return true;
+    }
+  }
+  return false;
+}
+/* TRANCHER UN ARBITRAGE : `choix` vaut "cet_appareil" ou "le_serveur". Rend une COPIE de la
+   fiche, où la version choisie est posée et l'entrée retirée de la quarantaine — jamais une
+   fiche à moitié tranchée. */
+function trancherArbitrage(o, cle, choix){
+  const a = o && o._fusion_arbitrages && o._fusion_arbitrages[cle];
+  if(!a) return { ok:false, motif:"cet arbitrage n'est plus en attente" };
+  if(choix !== "cet_appareil" && choix !== "le_serveur")
+    return { ok:false, motif:"choix inconnu : " + choix };
+  const copie = JSON.parse(JSON.stringify(o));
+  const v = a[choix];
+  if(a.type === "indicateur"){
+    for(const champ of GROUPE_INDICATEUR)
+      _poserFeuille(copie, champ, [a.periode, a.kpi_id], v ? v[champ] : null);
+  } else if(!_poserFeuille(copie, a.champ, a.parties, v)){
+    return { ok:false, motif:"cet arbitrage porte sur un champ que l'application ne sait pas reposer : " + a.champ };
+  }
+  delete copie._fusion_arbitrages[cle];
+  const journal = [];
+  _reaffirmerArchives(copie, journal);
+  return { ok:true, officine:copie, journal:journal };
+}
+
+/* Décrire un arbitrage EN MOTS, pour l'écran du Gérant. Pur et commun aux pôles : chacun
+   fournit seulement le nom de ses indicateurs. Un texte du DG n'est JAMAIS tronqué ici — c'est
+   précisément ce qu'il doit relire pour choisir. */
+const _CHAMP_NOTE_LIBELLE = { titre:"titre", mot:"mot du DG", verdict:"verdict du mois" };
+function decrireArbitrage(a, nomIndicateur){
+  const nom = function(id){
+    try{ return (nomIndicateur && nomIndicateur(id)) || String(id); }catch(e){ return String(id); }
+  };
+  const kpi = function(s){
+    if(!s) return "absent de cet appareil";
+    const i = Array.isArray(s.indicateurs) ? s.indicateurs[0] : null;
+    const v = !i ? "calculé, sans valeur lisible"
+      : (i.nom ? i.nom + " : " : "") +
+        (i.valeur === null || i.valeur === undefined ? "sans valeur" : String(i.valeur) + (i.unite ? " " + i.unite : "")) +
+        (i.verdict ? " (" + i.verdict + ")" : "");
+    return v + (s.date_analyse ? " — calculé le " + s.date_analyse : "");
+  };
+  const texte = function(v){
+    if(v === null || v === undefined) return "retiré";
+    if(typeof v === "string") return v === "" ? "(vide)" : v;
+    if(v.type === "constat") return "à constater : " + (v.libelle || "") + (v.atteint ? " — atteint" : "");
+    if(v.type === "mesure") return "mesuré : " + nom(v.kpi_id) + " " + (v.operateur || "") + " " +
+                                   (v.cible == null ? "" : v.cible) + (v.unite ? " " + v.unite : "");
+    if(v.titre) return String(v.titre);
+    return canon(v);
+  };
+  if(a.type === "indicateur")
+    return { titre:(a.periode ? a.periode + " · " : "") + nom(a.kpi_id),
+             cet_appareil:kpi(a.cet_appareil && a.cet_appareil.historique_mensuel),
+             le_serveur:kpi(a.le_serveur && a.le_serveur.historique_mensuel) };
+  const p = a.parties || [];
+  let quoi = _libelleChamp(a.champ);
+  if(a.champ === "commentaires_mensuels") quoi = "mot du mois — " + (_CHAMP_NOTE_LIBELLE[p[1]] || p[1]);
+  else if(a.champ === "commentaires_dg") quoi = "commentaire — " + (p[1] === "_global" ? "commentaire général" : nom(p[1]));
+  else if(a.champ === "objectifs_mensuels") quoi = "objectif";
+  return { titre:(a.periode ? a.periode + " · " : "") + quoi,
+           cet_appareil:texte(a.cet_appareil), le_serveur:texte(a.le_serveur) };
+}
+
+/* ---- 9. appliquer le résultat d'un cycle de synchro à la fiche OUVERTE ----
+   Le cycle (synchroniserAvecFusion, bloc noyau-cloud) travaille sur une PHOTOGRAPHIE de la fiche.
+   Pendant qu'il attend le réseau, le Gérant continue de taper. Deux règles :
+   · si le CONTENU a bougé pendant le cycle, on n'applique RIEN, et on relance. L'ancre n'ayant
+     pas avancé, le cycle suivant fusionnera la fiche à jour avec ce que le serveur porte
+     désormais — et ce qu'il porte contient déjà la photographie, donc rien ne se perd ;
+   · sinon on applique, mais TOUT CE QUI NE VOYAGE PAS reprend sa valeur COURANTE. Un mot de passe
+     de journal saisi pendant le cycle n'est pas dans l'empreinte : la photographie le ferait
+     revenir en arrière sans que rien ne le signale. Seules la version et l'ancre viennent du
+     cycle, qui vient de les établir. */
+const LOCAUX_ETABLIS_PAR_LE_CYCLE = ["_cloud_version", "_cloud_ancre"];
+function appliquerResultatSynchro(courante, resultat){
+  if(!courante || !resultat || !resultat.ok || !resultat.officine)
+    return { officine:courante, applique:false, relancer:false };
+  if(empreinteFusionnable(courante).globale !== resultat.empreinteDepart)
+    return { officine:courante, applique:false, relancer:true };
+  const o = JSON.parse(JSON.stringify(resultat.officine));
+  CHEMINS_HORS_CLOUD.forEach(function(ch){
+    if(ch.length === 2 && ch[0] === "config" && LOCAUX_ETABLIS_PAR_LE_CYCLE.indexOf(ch[1]) >= 0) return;
+    _retirerChemin(o, ch);
+    _reporterChemin(o, courante, ch);
+  });
+  Object.keys(REGLES_FUSION).forEach(function(k){
+    if(REGLES_FUSION[k] !== "local") return;
+    if(courante[k] === undefined) delete o[k];
+    else o[k] = JSON.parse(JSON.stringify(courante[k]));
+  });
+  return { officine:o, applique:true, relancer:false };
 }
 
 function nomFichierSauvegarde(officine){
@@ -3940,7 +4837,12 @@ async function _cleAesDepuisBits(bits){
 async function chiffrerPourCloud(officine, encKeyBits){
   const cle = await _cleAesDepuisBits(encKeyBits);
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const clair = new TextEncoder().encode(JSON.stringify(officine));
+  /* `officinePourCloud(officine)`, JAMAIS `officine`. Cette fonction est LE SEUL chemin vers le
+     serveur — pousserVersCloud() et rotationCode() passent toutes deux par elle — et c'est
+     pour cela que le filtre est ici : il est inévitable, pas recommandé. Le défaut du
+     28/09/2026 était exactement l'inverse : une fonction qu'il fallait PENSER à appeler, et que
+     deux pôles sur trois n'appelaient pas. Voir la note de CHEMINS_HORS_CLOUD. */
+  const clair = new TextEncoder().encode(JSON.stringify(officinePourCloud(officine)));
   const chiffre = await crypto.subtle.encrypt({name:"AES-GCM", iv:iv}, cle, clair);
   return { ciphertext:_b64(chiffre), iv:_b64(iv) };
 }
@@ -3989,7 +4891,10 @@ glob.KemetSauvegarde = {
   slugifie, nomFichierSauvegarde, nouvelIdentifiant, cleDe, adopterOfficine,
   compareVersions,
   officinePourExport, SECRETS_CLOUD_HORS_FICHIER, SECRETS_IMBRIQUES_HORS_FICHIER,
+  officinePourCloud, reinjecterLocaux, CHEMINS_HORS_CLOUD, CHEMINS_HORS_FICHIER,
   fichePorteMotDePasseJournal,
+  REGLES_FUSION, canon, empreinteFusionnable, ancreDepuis, decisionSynchro, fusionnerOfficines,
+  arbitragesEnAttente, arbitragesDuMois, trancherArbitrage, appliquerResultatSynchro, decrireArbitrage,
   secoursEcrire, secoursLire, secoursLister, secoursListerDetail, secoursSupprimer,
   memoireDisponible, demanderPersistance, persistanceAccordee,
   chiffrementDisponible, preparerVerrou, ouvrirVerrou,
@@ -4084,11 +4989,15 @@ async function activerSynchro(officine, verrouLocal, codeRecuperation){
 
 // Pousse la fiche courante vers le cloud. `encKeyBits` vient du cache local déchiffré au
 // déverrouillage (dechiffrerEncKeyLocalement) — jamais redemandé à l'utilisateur.
-async function pousserVersCloud(officine, sessionToken, handle, encKeyBits, versionAttendue){
+// `etiquette` (01/10/2026) : le pôle qui écrit — « achat », « tresorerie ». Le serveur l'accepte
+// et la range depuis le 04/09 (`device_label`) ; elle n'était jamais envoyée. Facultative.
+async function pousserVersCloud(officine, sessionToken, handle, encKeyBits, versionAttendue, etiquette){
   const { ciphertext, iv } = await SV.chiffrerPourCloud(officine, encKeyBits);
+  const corps = { ciphertext, iv, expected_version: Number(versionAttendue)||0 };
+  if(etiquette) corps.device_label = String(etiquette);
   const r = await _appel("/api/officines/" + handle + "/blob", {
     method:"PUT", headers:{"Content-Type":"application/json", "Authorization":"Bearer " + sessionToken},
-    body: JSON.stringify({ ciphertext, iv, expected_version: Number(versionAttendue)||0 }),
+    body: JSON.stringify(corps),
   });
   if(!r.ok){
     // `erreur` reste present ICI comme partout ailleurs (contrairement a avant ce correctif) :
@@ -4191,7 +5100,397 @@ async function rotationCode(sessionToken, handle, officine, ancienEncKeyBits, no
             version: r.corps.version!==undefined ? Number(r.corps.version) : undefined };
 }
 
-glob.KemetCloud = { activerSynchro, pousserVersCloud, tirerDuCloud, relierNouvelAppareil, rotationCode, authentifier, API_BASE };
+/* ==========================================================================
+   LA SYNCHRO AVEC FUSION — posée le 01/10/2026
+   ==========================================================================
+   tirer → décider → fusionner → pousser, sur le verrou optimiste du serveur.
+
+   POURQUOI. Jusqu'ici, une poussée refusée (409) allumait une bannière rouge, et la seule issue
+   était « garder la mienne » ou « prendre celle du serveur » — le perdant détruit. Avec deux
+   pôles qui écrivent dans la même fiche, ce refus serait arrivé à presque chaque passage de
+   l'un à l'autre. Le moteur de fusion (noyau-sauvegarde) sait désormais réunir deux versions ;
+   cette boucle est ce qui l'appelle au bon moment, avec la bonne version.
+
+   LA RÈGLE QUI COMPTE : on pousse avec `expected_version` = LA VERSION QU'ON VIENT DE LIRE, jamais
+   `_cloud_version`. Pousser une fusion en annonçant l'ancienne version, c'est se faire refuser à
+   coup sûr — ou pire, sur un serveur moins strict, écraser ce qu'on vient de fusionner.
+
+   LE CHEMIN COURANT NE COÛTE QU'UN ÉCHANGE, comme avant : cet appareil a travaillé et rien ne
+   dit que le serveur a bougé — on pousse directement. S'il a bougé, il refuse (409) sans rien
+   écraser, et alors seulement on lit et on fusionne.
+
+   CE QUE LA BOUCLE NE FAIT JAMAIS :
+     · modifier la fiche qu'on lui donne. Elle rend une fiche NEUVE ; c'est l'écran qui
+       l'applique, par SV.appliquerResultatSynchro — qui refuse si le Gérant a tapé pendant ce
+       temps ;
+     · marquer quoi que ce soit comme sauvegardé. Échec ou conflit persistant : le compteur du
+       bandeau reste ce qu'il est, et c'est lui qui pousse à télécharger le filet ;
+     · insister au-delà de trois essais. Au-delà, deux appareils écrivent en même temps sans
+       arrêt : on s'arrête et on le dit.
+
+   LA SESSION DURE 15 MINUTES côté serveur. Un refus 401 n'est pas une erreur : la boucle
+   demande UNE fois un jeton neuf à l'écran (`obtenirSession(true)`), qui détient la clé
+   d'authentification, puis rejoue l'appel.
+
+   ctx = { officine, handle, encKeyBits, obtenirSession: async (renouveler) => jeton|null,
+           etiquette?, toutGarderSansAncre?, reunirSansAncre?, essais? }
+   → { ok:true, issue:"poussee"|"reprise"|"fusion"|"reunion"|"rien-a-faire", officine, version, pousse,
+       arbitrages, avant, empreinteDepart, journal }
+   | { ok:false, issue:"demander", officineServeur, version, vuLe, motif?, erreur?, ... }
+   | { ok:false, bloquant:true, motif, champs, ... }      la fusion s'est arrêtée
+   | { ok:false, conflitPersistant:true, erreur, ... }
+   | { ok:false, erreur, ... }                             réseau, session, déchiffrement
+   ========================================================================== */
+function _copie(x){ return JSON.parse(JSON.stringify(x)); }
+
+async function synchroniserAvecFusion(ctx){
+  const journal = [];
+  const locale = ctx && ctx.officine;
+  if(!locale || !locale.config || !locale.config.synchro_cloud_active)
+    return { ok:false, issue:"hors-synchro", erreur:"Synchro cloud non activée pour cette officine.", journal:journal };
+  if(!ctx.handle || !ctx.encKeyBits || typeof ctx.obtenirSession !== "function")
+    return { ok:false, erreur:"Cet appareil n'est pas relié à la synchro cloud.", journal:journal };
+
+  const depart = SV.empreinteFusionnable(locale).globale;
+  const vLocale = Number(locale.config._cloud_version) || 0;
+  const essais = Number(ctx.essais) || 3;
+  const echec = function(champs){
+    return Object.assign({ ok:false, journal:journal, empreinteDepart:depart }, champs);
+  };
+
+  let jeton = await ctx.obtenirSession(false);
+  if(!jeton) return echec({ erreur:"Authentification impossible auprès du serveur." });
+  const avecSession = async function(fn){
+    let r = await fn(jeton);
+    if(r && r.statut === 401){
+      journal.push({ niv:"info", msg:"Synchro : session expirée (15 minutes) — reconnexion." });
+      jeton = await ctx.obtenirSession(true);
+      if(!jeton) return { ok:false, erreur:"La session a expiré et la reconnexion a échoué." };
+      r = await fn(jeton);
+    }
+    return r;
+  };
+  const conclure = function(fiche, version, issue, extra){
+    fiche.config._cloud_version = version;
+    fiche.config._cloud_ancre = SV.ancreDepuis(fiche, version);
+    return Object.assign({ ok:true, issue:issue, officine:fiche, version:version, pousse:false,
+      arbitrages:SV.arbitragesEnAttente(fiche).length, avant:locale, empreinteDepart:depart,
+      journal:journal }, extra || {});
+  };
+  const pousser = function(fiche, attendue){
+    return avecSession(function(j){
+      return pousserVersCloud(fiche, j, ctx.handle, ctx.encKeyBits, attendue, ctx.etiquette); });
+  };
+
+  // 1. le chemin courant : un seul échange
+  if(SV.decisionSynchro(locale, vLocale) === "poussee"){
+    const candidate = _copie(locale);
+    const p = await pousser(candidate, vLocale);
+    if(p.ok) return conclure(candidate, p.version, "poussee", { pousse:true });
+    if(!p.conflit) return echec({ erreur:"Envoi refusé — " + (p.erreur || "") });
+    journal.push({ niv:"info", msg:"Synchro : un autre appareil a écrit sur le serveur entre-temps — lecture et fusion." });
+  }
+
+  // 2. la boucle
+  for(let essai = 1; essai <= essais; essai++){
+    const lu = await avecSession(function(j){ return tirerDuCloud(j, ctx.handle, ctx.encKeyBits); });
+    let vDist = 0, distante = null, vuLe = null;
+    if(lu.ok){ vDist = lu.version; distante = lu.officine; vuLe = lu.updatedAt; }
+    else if(lu.statut !== 404) return echec({ erreur:"Lecture refusée — " + (lu.erreur || "") });
+
+    /* Le serveur vide alors que cet appareil y a déjà écrit : ce n'est pas « rien à fusionner »,
+       c'est une anomalie. On n'y renvoie rien sans qu'un humain l'ait regardée. */
+    if(!distante && vLocale > 0)
+      return echec({ issue:"demander", motif:"serveur-vide", version:0,
+        erreur:"Le serveur ne porte plus aucune fiche, alors que cet appareil y a envoyé la version " +
+               vLocale + ". Rien n'a été écrit : à examiner avant de renvoyer quoi que ce soit." });
+
+    const decision = SV.decisionSynchro(locale, vDist);
+    if(decision === "rien-a-faire")
+      return { ok:true, issue:"rien-a-faire", officine:_copie(locale), version:vDist, pousse:false,
+               arbitrages:SV.arbitragesEnAttente(locale).length, avant:locale,
+               empreinteDepart:depart, journal:journal };
+    /* SANS POINT DE COMPARAISON, on demande — sauf si le Gérant a déjà répondu « Réunir les deux
+       copies » (`ctx.reunirSansAncre`). La réunion se fait alors SANS AUCUNE ANCRE, même une
+       ancre périmée : union de tout, rien n'est retiré, les cases écrites des deux côtés en
+       quarantaine. C'est exactement ce que le bouton promet — « rien n'est perdu » — et rien de
+       plus : un élément retiré d'un côté peut réapparaître, et le journal le dit. */
+    const reunion = (decision === "demander" && !!ctx.reunirSansAncre);
+    if(decision === "demander" && !reunion)
+      return echec({ issue:"demander", officineServeur:distante, version:vDist, vuLe:vuLe });
+    /* « poussee » NE PEUT PAS ARRIVER ICI : elle exige un serveur resté à la version de cet
+       appareil, cas déjà traité par la poussée directe ci-dessus (le banc de la boucle l'a
+       montré le 01/10/2026 : une branche écrite pour lui n'était exercée par aucun cas). Si un
+       changement futur la rendait possible, on s'arrête — dans le sens sûr, sans rien écrire. */
+    if(decision !== "reprise" && decision !== "fusion" && !reunion)
+      return echec({ erreur:"Décision de synchro inattendue : " + decision + ". Rien n'a été écrit." });
+
+    let aFusionner = locale;
+    if(reunion){ aFusionner = _copie(locale); delete aFusionner.config._cloud_ancre; }
+    const f = SV.fusionnerOfficines(aFusionner, distante,
+      { vuLe:vuLe, versionServeur:vDist, toutGarderSansAncre: reunion || !!ctx.toutGarderSansAncre });
+    f.journal.forEach(function(l){ journal.push(l); });
+    if(!f.ok) return echec({ bloquant:!!f.bloquant, motif:f.motif, champs:f.champs || [],
+                             erreur:"La fusion s'est arrêtée : " + f.motif });
+    const candidate = f.officine;
+    const issue = reunion ? "reunion" : decision;
+    /* Rien à renvoyer quand la fiche réunie porte exactement ce que le serveur porte déjà —
+       le cas ordinaire d'une reprise. */
+    if(SV.empreinteFusionnable(candidate).globale === SV.empreinteFusionnable(distante).globale)
+      return conclure(candidate, vDist, issue);
+    const p = await pousser(candidate, vDist);
+    if(p.ok) return conclure(candidate, p.version, issue, { pousse:true });
+    if(!p.conflit) return echec({ erreur:"Envoi refusé — " + (p.erreur || "") });
+    journal.push({ niv:"info", msg:"Synchro : un autre appareil a écrit pendant la fusion — essai " +
+                   (essai + 1 <= essais ? (essai + 1) + " sur " + essais : "abandonné") + "." });
+  }
+  return echec({ conflitPersistant:true,
+    erreur:"Un autre appareil écrit sur le serveur en même temps, sans arrêt : la synchro s'arrête " +
+           "après " + essais + " essais. Rien n'a été écrasé, ni ici ni là-bas. Réessayer dans un " +
+           "moment ; en attendant, télécharger la sauvegarde." });
+}
+
+/* ==========================================================================
+   LE PILOTE DE SYNCHRO — l'orchestration commune aux pôles, posée le 01/10/2026
+   ==========================================================================
+   POURQUOI ICI, ET SANS LA PAGE. L'Achat et la Trésorerie doivent se comporter EXACTEMENT pareil
+   face au serveur : quand reprendre, quand demander, quoi marquer sauvegardé, quoi dire. Écrite
+   deux fois, cette logique aurait dérivé — c'est la forme exacte du défaut du 28/09/2026, une
+   protection posée dans un pôle et pas dans l'autre. Elle vit donc ici, une fois. Chaque pôle la
+   branche avec ses propres mains, et le pilote ne touche jamais la page.
+
+   hote = {
+     etiquette                     « achat », « tresorerie » — envoyée au serveur
+     lireOfficine()                → la fiche ouverte, ou null
+     lireCles()                    → { encKeyBits, handle } si cet appareil est relié, sinon null
+     obtenirSession(renouveler)    → jeton | null
+     enregistrer(officine)         → Promise<bool> : la poser comme fiche ouverte ET l'écrire dans
+                                     la mémoire locale, SANS relancer de synchro
+     journal(niv, msg)
+     contenuChange(officine, ctx)  le contenu affiché a changé (ctx.issue : "reprise", "fusion",
+                                   "reunion", "recuperation", "annulation", "arbitrage") :
+                                   ré-afficher les écrans, montrer le bandeau de reprise
+     rafraichir()                  bandeau, bannière, arbitrages
+   }
+
+   CE QUE LE PILOTE GARANTIT, et que les deux pôles reçoivent sans y penser :
+     · une question posée au Gérant (« demander », fusion arrêtée) suspend la synchro de fond
+       jusqu'à sa réponse — on ne pousse jamais par-dessus une question ouverte ;
+     · un seul cycle à la fois ; une demande pendant un cycle en relance UN après ;
+     · un résultat arrivé alors qu'une AUTRE officine a été ouverte est ignoré ;
+     · « sauvegardé » n'est marqué que lorsque le serveur porte vraiment tout le contenu local ;
+     · tout ce qui pose une version pose aussi l'ANCRE — sans elle, la synchro suivante
+       reposerait la question au lieu de reprendre normalement. */
+function creerPiloteSynchro(hote){
+  let enCours = false, aRelancer = false, question = null, derniereReprise = null;
+  const cles = function(){
+    const c = hote.lireCles && hote.lireCles();
+    return (c && c.encKeyBits && c.handle) ? c : null;
+  };
+  const etatSynchro = function(o, s){ if(o) o._synchroCloud = s; };
+  const ISSUES_AVEC_ARRIVEE = ["reprise", "fusion", "reunion"];
+
+  /* Un appel réseau avec UNE reconnexion si la session a expiré. */
+  async function _avecSession(fn){
+    let jeton = await hote.obtenirSession(false);
+    if(!jeton) return { ok:false, erreur:"Authentification impossible auprès du serveur." };
+    let r = await fn(jeton);
+    if(r && r.statut === 401){
+      jeton = await hote.obtenirSession(true);
+      if(!jeton) return { ok:false, erreur:"La session a expiré et la reconnexion a échoué." };
+      r = await fn(jeton);
+    }
+    return r;
+  }
+  /* Pose la version ET l'ancre sur la fiche qui vient d'être alignée sur le serveur. */
+  function _aligner(o, version, contenuEnvoye){
+    o.config._cloud_version = version;
+    o.config._cloud_ancre = SV.ancreDepuis(contenuEnvoye || o, version);
+    etatSynchro(o, { conflit:false, erreur:false });
+    if(!contenuEnvoye || SV.empreinteFusionnable(o).globale === SV.empreinteFusionnable(contenuEnvoye).globale){
+      SV.marquerSauvegarde(o);
+      o.derniere_sauvegarde_source = "cloud";
+    }
+  }
+  /* Fin de toute action : on libère, on rafraîchit, et une synchro demandée pendant ce temps
+     part maintenant — une seule. */
+  function _terminer(){
+    enCours = false;
+    hote.rafraichir();
+    if(aRelancer){ aRelancer = false; lancer(); }
+  }
+  async function _enregistrer(o){
+    const ok = await hote.enregistrer(o);
+    if(!ok) hote.journal("err", "Synchro cloud : la fiche n'a PAS pu être enregistrée dans ce navigateur. " +
+                         "Télécharger la sauvegarde avant de fermer l'onglet.");
+    return ok;
+  }
+
+  async function lancer(options){
+    options = options || {};
+    const depart = hote.lireOfficine();
+    const c = cles();
+    if(!depart || !depart.config || !depart.config.synchro_cloud_active || !c) return { ok:false, issue:"hors-synchro" };
+    if(enCours){ aRelancer = true; return { ok:false, issue:"en-cours" }; }
+    if(depart._synchroCloud && depart._synchroCloud.conflit && !options.reunirSansAncre)
+      return { ok:false, issue:"question-en-attente" };
+    enCours = true;
+    try{
+      const r = await synchroniserAvecFusion({ officine:depart, handle:c.handle, encKeyBits:c.encKeyBits,
+        obtenirSession:hote.obtenirSession, etiquette:hote.etiquette, reunirSansAncre:!!options.reunirSansAncre });
+      await _traiter(depart, r);
+      return r;
+    }catch(e){
+      const courante = hote.lireOfficine();
+      if(courante) etatSynchro(courante, Object.assign({}, courante._synchroCloud, { erreur:true }));
+      hote.journal("err", "Synchro cloud : erreur inattendue (" + ((e && e.message) || e) + "). Rien n'a été écrasé.");
+      return { ok:false, erreur:String((e && e.message) || e) };
+    }finally{ _terminer(); }
+  }
+
+  async function _traiter(depart, r){
+    (r.journal || []).forEach(function(l){ hote.journal(l.niv, l.msg); });
+    const courante = hote.lireOfficine();
+    if(!courante || String(courante.id) !== String(depart.id)) return;   // une autre officine est ouverte
+    if(r.ok){
+      question = null;
+      etatSynchro(courante, { conflit:false, erreur:false });
+      const ap = SV.appliquerResultatSynchro(courante, r);
+      if(!ap.applique){ if(ap.relancer) aRelancer = true; return; }
+      const o = ap.officine;
+      etatSynchro(o, { conflit:false, erreur:false });
+      SV.marquerSauvegarde(o);                 // le serveur porte désormais TOUT le contenu local
+      o.derniere_sauvegarde_source = "cloud";
+      const arrive = ISSUES_AVEC_ARRIVEE.indexOf(r.issue) >= 0 &&
+                     SV.empreinteFusionnable(o).globale !== r.empreinteDepart;
+      await _enregistrer(o);
+      if(arrive){
+        derniereReprise = { avant:r.avant, issue:r.issue, version:r.version, journal:r.journal || [] };
+        hote.contenuChange(o, { issue:r.issue, resultat:r });
+      }
+      return;
+    }
+    if(r.issue === "demander" || r.bloquant){
+      question = r;
+      etatSynchro(courante, { conflit:true, erreur:false });
+      if(r.issue === "demander" && r.motif !== "serveur-vide")
+        hote.journal("warn", "Synchro cloud : la copie du serveur a changé, et cet appareil n'a pas de " +
+          "point de comparaison avec elle. Rien n'a été tranché tout seul : choisir dans la bannière rouge.");
+      else if(r.erreur && !r.bloquant) hote.journal("err", "Synchro cloud : " + r.erreur);
+      return;
+    }
+    if(r.issue === "hors-synchro") return;
+    etatSynchro(courante, Object.assign({}, courante._synchroCloud, { erreur:true }));
+    hote.journal(r.conflitPersistant ? "warn" : "err", "Synchro cloud : " + (r.erreur || "échec, sans détail."));
+  }
+
+  /* « Réunir les deux copies » — la réponse à une question « demander » ordinaire. */
+  async function reunir(){
+    if(!question || question.issue !== "demander" || question.motif === "serveur-vide")
+      return { ok:false, erreur:"Aucune réunion à faire." };
+    return lancer({ reunirSansAncre:true });
+  }
+
+  /* « Garder la copie de cet appareil (écrase le cloud) ». On lit d'abord la version RÉELLE du
+     serveur : l'imposer par-dessus ce qui existe là-bas maintenant, pas rejouer une ancienne
+     version qui retomberait sur le même refus. Serveur vide (404) : version 0. */
+  async function imposerCetAppareil(){
+    const o = hote.lireOfficine(), c = cles();
+    if(!o || !c) return { ok:false, erreur:"Cet appareil n'est pas relié." };
+    if(enCours) return { ok:false, issue:"en-cours" };
+    enCours = true;
+    try{
+      const lu = await _avecSession(function(j){ return tirerDuCloud(j, c.handle, c.encKeyBits); });
+      if(!lu.ok && lu.statut !== 404){
+        hote.journal("err", "Synchro cloud : impossible de lire l'état du serveur avant d'écraser — rien n'a été envoyé. " + (lu.erreur || ""));
+        return lu;
+      }
+      const envoyee = _copie(o);
+      const p = await _avecSession(function(j){
+        return pousserVersCloud(envoyee, j, c.handle, c.encKeyBits, lu.ok ? lu.version : 0, hote.etiquette); });
+      if(!p.ok){ hote.journal("err", "Synchro cloud : l'écrasement a échoué — " + (p.erreur || "réessayer.")); return p; }
+      _aligner(o, p.version, envoyee);
+      question = null;
+      await _enregistrer(o);
+      hote.journal("ok", "Copie de cet appareil imposée au cloud (version " + p.version + "). " +
+                   "La copie que portait le serveur est remplacée.");
+      return { ok:true, version:p.version };
+    }finally{ _terminer(); }
+  }
+
+  /* « Récupérer la copie du cloud (écrase cet appareil) ». Tout ce qui ne voyage pas — mot de
+     passe du journal, clés de l'appareil, périmètre du pôle — est reposé depuis la fiche d'ici. */
+  async function prendreLeServeur(){
+    const o = hote.lireOfficine(), c = cles();
+    if(!o || !c) return { ok:false, erreur:"Cet appareil n'est pas relié." };
+    if(enCours) return { ok:false, issue:"en-cours" };
+    enCours = true;
+    try{
+      const lu = await _avecSession(function(j){ return tirerDuCloud(j, c.handle, c.encKeyBits); });
+      if(!lu.ok){ hote.journal("err", "Synchro cloud : lecture refusée — " + (lu.erreur || "réessayer.")); return lu; }
+      const nouvelle = SV.reinjecterLocaux(lu.officine, o);
+      _aligner(nouvelle, lu.version);
+      question = null; derniereReprise = null;
+      await _enregistrer(nouvelle);
+      hote.journal("ok", "Copie du cloud récupérée (version " + lu.version + "). Les changements faits sur " +
+                   "cet appareil depuis la dernière synchro sont remplacés.");
+      hote.contenuChange(nouvelle, { issue:"recuperation" });
+      return { ok:true, version:lu.version };
+    }finally{ _terminer(); }
+  }
+
+  /* « Annuler cette reprise » : la fiche revient à son état d'avant, ICI ET SUR LE CLOUD. Ce qui
+     venait d'arriver de l'autre appareil en est donc retiré, partout — l'écran le dit avant le
+     clic. Si un autre appareil a écrit depuis, on refuse : annuler écraserait SON travail. */
+  async function annulerReprise(){
+    const rep = derniereReprise, o = hote.lireOfficine(), c = cles();
+    if(!rep || !rep.avant || !o || !c) return { ok:false, erreur:"Aucune reprise à annuler." };
+    if(enCours) return { ok:false, issue:"en-cours" };
+    enCours = true;
+    try{
+      const restauree = SV.reinjecterLocaux(_copie(rep.avant), o);
+      const p = await _avecSession(function(j){
+        return pousserVersCloud(restauree, j, c.handle, c.encKeyBits, o.config._cloud_version, hote.etiquette); });
+      if(!p.ok){
+        hote.journal("err", p.conflit
+          ? "Reprise NON annulée : un autre appareil a écrit sur le serveur depuis. L'annuler maintenant écraserait son travail."
+          : "Reprise NON annulée — " + (p.erreur || "réessayer."));
+        return p;
+      }
+      _aligner(restauree, p.version);
+      derniereReprise = null;
+      await _enregistrer(restauree);
+      hote.journal("ok", "Reprise annulée : la fiche est revenue à son état d'avant, ici et sur le cloud (version " + p.version + ").");
+      hote.contenuChange(restauree, { issue:"annulation" });
+      return { ok:true, version:p.version };
+    }finally{ _terminer(); }
+  }
+
+  /* Trancher un arbitrage, puis faire partir la décision. */
+  async function trancher(cle, choix){
+    const o = hote.lireOfficine();
+    if(!o) return { ok:false };
+    const t = SV.trancherArbitrage(o, cle, choix);
+    if(!t.ok){ hote.journal("err", "Arbitrage : " + t.motif); return t; }
+    (t.journal || []).forEach(function(l){ hote.journal(l.niv, l.msg); });
+    await _enregistrer(t.officine);
+    hote.contenuChange(t.officine, { issue:"arbitrage" });
+    await lancer();
+    return t;
+  }
+
+  return {
+    lancer:lancer, reunir:reunir, imposerCetAppareil:imposerCetAppareil, prendreLeServeur:prendreLeServeur,
+    annulerReprise:annulerReprise, trancher:trancher,
+    question:function(){ return question; },
+    derniereReprise:function(){ return derniereReprise; },
+    oublierReprise:function(){ derniereReprise = null; },
+    enCours:function(){ return enCours; },
+  };
+}
+
+glob.KemetCloud = { activerSynchro, pousserVersCloud, tirerDuCloud, relierNouvelAppareil, rotationCode, authentifier,
+                    synchroniserAvecFusion, creerPiloteSynchro, API_BASE };
 })(window);
 </script>
 <script id="guide-collecte">
