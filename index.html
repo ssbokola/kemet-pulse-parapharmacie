@@ -34,15 +34,15 @@ Aucun serveur, aucune base, aucune bibliotheque distante : tout est lu dans ce
 navigateur, et le programme lui-meme est dans ce fichier.
 
 Blocs partages avec l'application officine, copies tels quels a la construction :
-     noyau-util         SHA-1 e5b2667135cc
+     noyau-util         SHA-1 862d2d517d14
      noyau-lecture      SHA-1 e0fe1671960a
      noyau-equivalences SHA-1 e4781ef666cd
-     noyau-agregation   SHA-1 bf1537e1a8bd
-     noyau-sauvegarde   SHA-1 40090dd31459
-     noyau-cloud        SHA-1 6173c554ca5d
+     noyau-agregation   SHA-1 7ed2f078a4a1
+     noyau-sauvegarde   SHA-1 2650c76014e4
+     noyau-cloud        SHA-1 9462bce522a2
      noyau-livrables    SHA-1 fda508d4dd56
-     guide-collecte     SHA-1 59985ccd9186
-     lexique-note       SHA-1 fafe3bc584c3
+     guide-collecte     SHA-1 488a450aae32
+     lexique-note       SHA-1 01c64433d904
      modules-registre   SHA-1 7bad12a353a3
      lib-xlsx           SHA-1 7f749f81a45a
      lib-jszip          SHA-1 c96375d50e72
@@ -1849,8 +1849,10 @@ main { max-width: 1240px; margin: 0 auto; padding: var(--sp-6) var(--sp-8) var(-
   <section class="bloc">
     <div class="kp-drop" id="depot-fichiers" role="button" tabindex="0">
       <span class="kp-drop__title">Déposer ici les fichiers du mois</span>
-      <span class="kp-drop__text">État de stock détaillé (n°20) et CA par sous-emplacement
-      (n°33) — les mêmes exports Médiciel que le pôle Achat. Ou cliquer pour les choisir.</span>
+      <!-- 4e passe (02/10/2026) : la marge lit l'historique stock (B1), pas l'état n°20. -->
+      <span class="kp-drop__text">Historique stock complet (B1) du dernier jour du mois, CA par
+      sous-emplacement (n°33) et les autres pièces du pôle Achat — les mêmes exports Médiciel. Ou
+      cliquer pour les choisir.</span>
     </div>
     <p class="kp-body kp-secondary">
       Le dossier a des sous-dossiers ? Le glisser-déposer ci-dessus peut les manquer selon le
@@ -1967,8 +1969,9 @@ main { max-width: 1240px; margin: 0 auto; padding: var(--sp-6) var(--sp-8) var(-
         <li>Ouvrir l'application (double-clic) et déposer le fichier de sauvegarde de l'officine —
         ou le retrouver dans « Reprendre où vous en étiez » s'il est déjà en mémoire.</li>
         <li>Choisir la période dans l'en-tête, en haut à droite.</li>
-        <li>Dans « Déposer les fichiers », glisser l'état de stock détaillé et le CA par
-        sous-emplacement du mois. Le journal dit ce qui est reconnu.</li>
+        <li>Dans « Déposer les fichiers », glisser l'historique stock (B1) du dernier jour du mois
+        et le CA par sous-emplacement du mois. Le journal dit ce qui est reconnu, et ce qui est
+        refusé.</li>
         <li>Lire « Vue d'ensemble », ouvrir « Tendances » pour le mois précédent.</li>
         <li>Télécharger la sauvegarde (bandeau en haut) — c'est elle qui porte l'historique.</li>
       </ol>
@@ -1984,11 +1987,27 @@ main { max-width: 1240px; margin: 0 auto; padding: var(--sp-6) var(--sp-8) var(-
       <table class="kp-table">
         <thead><tr><th>Indicateur</th><th>Écran Médiciel</th><th>Ce qu'il vérifie</th></tr></thead>
         <tbody>
-          <tr><td>Poids de la para dans le CA, marge</td><td>État CA par sous-emplacement, état
+          <tr><td>Poids de la para dans le CA</td><td>État CA par sous-emplacement, état
           n°33</td><td>Sa période déclarée doit correspondre au mois affiché.</td></tr>
-          <tr><td>Stock para qui dort, périmés en para</td><td>État de stock détaillé, état
-          n°20 — les mêmes fichiers que le pôle Achat</td><td>Ces deux indicateurs republient ce
-          qu'Achat a déjà calculé sur les mêmes fichiers ; ils ne recalculent rien de nouveau.</td></tr>
+          <!-- 4e passe (02/10/2026) : la marge ne lit ni le CA par sous-emplacement ni l'état n°20,
+               mais l'historique stock complet (B1), dont la date se lit dans le nom ; le stock para
+               qui dort et les périmés en para le lisent aussi.
+               5e passe (03/10/2026) : sa date se lit d'abord dans le nom de son onglet, où Médiciel
+               l'écrit ; il se sort après la fin du mois, à la date choisie. -->
+          <tr><td>Marge</td><td>Historique stock complet (« B1 »), sorti de Médiciel après la fin du
+          mois à la date du dernier jour du mois — Médiciel écrit cette date dans le nom de
+          l'onglet, par exemple « VALEURS STOCKS - 30-09-26 » : inutile de renommer le fichier</td>
+          <td>La date lue dans son onglet (à défaut, dans le nom du fichier, avec son année) doit
+          être le dernier jour du mois affiché ; sinon il est refusé et nommé, et la marge n'est
+          pas publiée.</td></tr>
+          <tr><td>Stock para qui dort, périmés en para</td><td>Les mêmes fichiers que le pôle Achat.
+          Stock qui dort : l'historique stock (B1) du dernier jour du mois ou, à défaut, l'état n°20,
+          le TCD des ventes et une table des sous-emplacements. Périmés : les corrections de stock,
+          le CA par sous-emplacement, le suivi des périmés et l'historique stock (B1) du dernier jour
+          du mois, qui range chaque produit périmé dans son rayon et son pôle — d'un autre jour, il
+          est refusé et nommé, et les périmés en para ne sont pas publiés</td><td>Ces
+          deux indicateurs republient ce qu'Achat a déjà calculé sur les mêmes fichiers ; ils ne
+          recalculent rien de nouveau.</td></tr>
         </tbody>
       </table>
       <p class="kp-micro kp-muted">Un fichier de l'autre mois n'est jamais accepté en silence : le
@@ -2060,8 +2079,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 // rapports remis au client. Avec vingt abonnés sur des versions différentes, « quelle
 // version a mon client ? » doit avoir une réponse. Le banc test_version.js refuse la
 // publication si une source a été modifiée APRÈS cette date.
-const APP_VERSION = "1.4.6";
-const APP_DATE = "2026-10-01";
+const APP_VERSION = "1.4.7";
+const APP_DATE = "2026-10-03";
 
 /* ---------- primitives façon Python (portées de conformite-bl-app.html) ---------- */
 
@@ -3297,10 +3316,19 @@ function construireEcarts(kpiSummaries, period){
     if(period && !U.matchPeriod(s.periode_analysee, period)) continue;
     trouves[kid] = s;
   }
-  const hors = [];
+  /* 4e passe (02/10/2026) — UN KPI NON PUBLIABLE N'EST PAS « HORS OBJECTIF ». Son verdict est
+     vide parce qu'on ne sait pas, et `!== "vert"` le rangeait avec les indicateurs mesurés en
+     rouge : ses actions montaient au plan d'actions, et le classeur des écarts écrivait « null % »
+     dans sa colonne Valeur (septembre 2026 : réclamations et rapprochement de quinzaine). Il est
+     désormais compté à part, nommé par les appelants, et jamais jugé. */
+  const hors = [], nonPubliables = [];
   for(const [kid, s] of Object.entries(trouves)){
     const inds = s.indicateurs||[];
     if(!inds.length) continue;
+    if(String(s.statut||"").toUpperCase().indexOf("NON PUBLIABLE")>=0){
+      nonPubliables.push({ kid: kid, titre: TITRES_ECARTS[kid]||kid });
+      continue;
+    }
     if((inds[0].verdict||"").toLowerCase()!=="vert") hors.push([kid, s]);
   }
   const ordre = {rouge:0, orange:1};
@@ -3345,7 +3373,7 @@ function construireEcarts(kpiSummaries, period){
      il a devant lui. Voir _tests/test_ecarts_periode_vide.js. */
   const mesures = Object.keys(trouves).length;
   return { detail, planActions: acts, aucunHorsObjectif: detail.length===0,
-           mesures: mesures, aucuneMesure: mesures===0 };
+           mesures: mesures, aucuneMesure: mesures===0, nonPubliables: nonPubliables };
 }
 
 glob.KemetAgregation = {
@@ -4454,8 +4482,24 @@ const LOCAUX_ETABLIS_PAR_LE_CYCLE = ["_cloud_version", "_cloud_ancre"];
 function appliquerResultatSynchro(courante, resultat){
   if(!courante || !resultat || !resultat.ok || !resultat.officine)
     return { officine:courante, applique:false, relancer:false };
-  if(empreinteFusionnable(courante).globale !== resultat.empreinteDepart)
+  if(empreinteFusionnable(courante).globale !== resultat.empreinteDepart){
+    /* LE CYCLE N'A FAIT QU'ENVOYER LA PHOTOGRAPHIE (corrigé le 01/10/2026). Le serveur la porte
+       désormais, à la version du cycle ; la fiche courante = cette photographie + ce qui a été
+       tapé depuis. Lui donner la version et l'ancre de la photographie est donc EXACT, et c'est
+       indispensable : sans elles, une fiche encore sans ancre (premier passage après la mise à
+       jour) voyait au cycle suivant un serveur « plus loin » qu'elle et concluait qu'un autre
+       appareil avait écrit — bannière rouge, et « Prendre la copie du cloud » aurait effacé le
+       dépôt. Rien du contenu courant n'est touché. Quand le cycle a RÉCUPÉRÉ quelque chose (reprise,
+       fusion), on ne fait rien de tel : l'ancre décrirait un contenu que la fiche n'a pas, et
+       le cycle suivant fusionne déjà correctement avec l'ancre d'avant. */
+    if(resultat.issue === "poussee" && resultat.pousse){
+      const v = JSON.parse(JSON.stringify(courante));
+      v.config._cloud_version = resultat.officine.config._cloud_version;
+      v.config._cloud_ancre = resultat.officine.config._cloud_ancre;
+      return { officine:v, applique:false, versionSeule:true, relancer:true };
+    }
     return { officine:courante, applique:false, relancer:true };
+  }
   const o = JSON.parse(JSON.stringify(resultat.officine));
   CHEMINS_HORS_CLOUD.forEach(function(ch){
     if(ch.length === 2 && ch[0] === "config" && LOCAUX_ETABLIS_PAR_LE_CYCLE.indexOf(ch[1]) >= 0) return;
@@ -5362,7 +5406,12 @@ function creerPiloteSynchro(hote){
       question = null;
       etatSynchro(courante, { conflit:false, erreur:false });
       const ap = SV.appliquerResultatSynchro(courante, r);
-      if(!ap.applique){ if(ap.relancer) aRelancer = true; return; }
+      if(!ap.applique){
+        // la version et l'ancre de ce qui vient d'être envoyé, sans toucher au contenu courant
+        if(ap.versionSeule) await _enregistrer(ap.officine);
+        if(ap.relancer) aRelancer = true;
+        return;
+      }
       const o = ap.officine;
       etatSynchro(o, { conflit:false, erreur:false });
       SV.marquerSauvegarde(o);                 // le serveur porte désormais TOUT le contenu local
@@ -5914,6 +5963,9 @@ function jetons(periode){
   return {
     debM: fr(y, m, 1),
     finM: fr(y, m, finDeMois(y, m)),
+    // 4e passe (02/10/2026) : la fin du mois écrite comme dans le NOM du B1 (« 30-09-26 ») — celle
+    // que lit module-delai_ecoulement (nomConseilleB1) ; un banc vérifie qu'elles concordent.
+    finMnom: String(finDeMois(y, m)).padStart(2,"0")+"-"+String(m).padStart(2,"0")+"-"+String(y).slice(-2),
     m2deb: fr(m2y, m2m, 1),
     m4deb: fr(m4y, m4m, 1),
     y2: "01/01/"+(y-2),
@@ -5944,9 +5996,14 @@ function resoudre(txt, j){
 // Un groupe sans kpi est hors pôle Achat : il est affiché pour mémoire, sans statut.
 const GROUPES = [
   { num:"1", titre:"Écoulement & stock mort", kpi:["delai_ecoulement"], pieces:[
-    { t:"État n°20 « VALEUR DU STOCK A UNE DATE (DETAILLEE) » — photo au {finM}",
+    /* 5e passe (03/10/2026) : « photo au {finM} » laissait croire qu'il fallait le sortir ce jour-là.
+       Médiciel le sort À LA DATE CHOISIE, après la fin du mois (mesuré : l'état « AU 30/09/2026 »
+       de septembre a été sorti le 01/10 et exclut les BL saisis le 01/10). */
+    { t:"État n°20 « VALEUR DU STOCK A UNE DATE (DETAILLEE) » — à la date du {finM}",
       ou:"Accueil → ESPACE PHARMACIENS → « Centre Impres. » → onglet GESTION DE STOCKS",
-      piege:"Pas le n°21 RESUME : il ne porte pas le détail par produit.",
+      piege:"Il se sort après la fin du mois, quand vous voulez, en choisissant dans Médiciel la "+
+            "date du dernier jour du mois : c'est elle qu'il imprime (« VALEUR DU STOCK AU … ») et "+
+            "que l'application vérifie. Pas le n°21 RESUME : il ne porte pas le détail par produit.",
       img:"guide/mediciel-stocks-1-24.webp" },
     { t:"TCD des ventes — du {y2} au {finM}, MODELE 2 (PRODUITS), regroupé par SOUS-EMPLACEMENT, TOUS",
       ou:"Espace Pharmacien → Statistiques C.A. → +TCD : CA/QTE détaillés → Détails CA",
@@ -5957,9 +6014,45 @@ const GROUPES = [
       ou:"Accueil → ESPACE PHARMACIENS → « Centre Impres. » → onglet GESTION DE STOCKS",
       piege:"Pas le n°14, dont la population est différente.",
       img:"guide/mediciel-stocks-19-39.webp" },
-    { t:"État n°22 « LISTING PAR SOUS-EMPLACEMENT » — photo au {finM}",
+    /* 5e passe (03/10/2026) : l'état n°22 n'est pas une photo datée — c'est la table qui range
+       chaque produit dans son sous-emplacement (7 007 produits, 97 sous-emplacements en
+       septembre). « photo au {finM} » était faux. */
+    { t:"État n°22 « LISTING PAR SOUS-EMPLACEMENT » — à sortir au début du mois suivant",
       ou:"Accueil → ESPACE PHARMACIENS → « Centre Impres. » → onglet GESTION DE STOCKS",
+      piege:"Ce n'est pas une photo datée : c'est la table qui range chaque produit dans son "+
+            "sous-emplacement. Sortez-le au début du mois suivant, avec les autres pièces.",
       img:"guide/mediciel-stocks-1-24.webp" },
+    /* 4e passe (02/10/2026) — LE B1 ENTRE AU GUIDE. Le module le lit EN PREMIER (Mode A) quand il
+       est déposé, et le guide ne le nommait pas. Il n'a aucune date dans ses cellules, et il n'est
+       retenu que s'il est la photo du DERNIER jour du mois demandé (la règle de la photo de l'état
+       n°20, cf. module-delai_ecoulement). Aucun chemin Médiciel n'est écrit : il n'est pas établi
+       ici, et un chemin inventé serait un texte faux.
+       5e passe (03/10/2026) — SA DATE EST DANS SON ONGLET. Médiciel sort l'historique du stock À UNE
+       DATE CHOISIE, après la fin du mois, et l'écrit dans le nom de l'onglet (« VALEURS STOCKS -
+       30-06-26 ») ; le module la lit là (dateDeLOnglet), le nom du fichier ne décide plus que si
+       l'onglet a été renommé. Le guide disait de le sortir le dernier jour en fin de journée et
+       que Médiciel ne savait pas le produire après coup : c'était faux, et le renommage inutile. */
+    { option:true,
+      t:"Historique stock complet (« B1 » : sans titre, VM en ligne 1) — à la date du {finM}, "+
+        "onglet « VALEURS STOCKS - {finMnom} »",
+      ou:"Médiciel — l'historique du stock complet, par produit, tous produits et tous stocks, à "+
+         "la date choisie : Médiciel écrit cette date dans le nom de l'onglet, inutile de renommer "+
+         "le fichier",
+      piege:"Facultatif pour le délai : sans lui, il se calcule sur l'état n°20 et le TCD ci-dessus. S'il "+
+            "est déposé, il passe EN PREMIER, à une condition : être l'historique du stock au "+
+            "DERNIER jour du mois. Il se sort après la fin du mois, quand vous voulez, en choisissant "+
+            "cette date dans Médiciel, qui l'écrit dans le nom de l'onglet (« VALEURS STOCKS - "+
+            "JJ-MM-AA ») : l'application la lit là. Si l'onglet a été renommé, la date se lit dans le "+
+            "nom du fichier, AVEC SON ANNÉE, écrite « historique stock du JJ-MM-AA » "+
+            "(collés, « JJMMAA », ils conviennent aussi ; le jour et le mois seuls, sans l'année, "+
+            "non). Un nom qui porte une autre date que l'onglet est signalé au journal : l'onglet "+
+            "fait foi. Daté d'un autre jour, il est refusé et nommé au journal ; sans date lisible, "+
+            "il est écarté de même. L'état n°20 et le TCD prennent alors le "+
+            "relais s'ils sont déposés et que la photo de l'état n°20 est bien celle du dernier "+
+            "jour du mois — sinon rien n'est publié. Les périmés (groupe 4) le lisent aussi, à la "+
+            "même condition de date, pour ranger chaque produit périmé dans son rayon et son pôle "+
+            "et pour les ventes du critère FEFO : sans lui, leur ventilation officine/para n'est "+
+            "pas publiée." },
   ]},
   { num:"2", titre:"Ruptures", kpi:["ruptures"], pieces:[
     { t:"Ruptures EN COURS — du 01/01/2024 au {today}, période LARGE",
@@ -5994,9 +6087,9 @@ const GROUPES = [
     { t:"Les mêmes fichiers des TROIS années précédentes — « PERIMES {an1} », « PERIMES {an2} », « PERIMES {an3} »",
       ou:"tenu par l'officine — à déposer avec le reste, chaque mois",
       piege:"C'est la SEULE source des récidivistes. Un récidiviste est un produit périmé sur au "+
-            "moins deux années différentes : avec une seule année déposée, le compte tombe "+
-            "mécaniquement à zéro — et ce zéro voudra dire « on ne sait pas », jamais « il n'y "+
-            "en a pas ». Le moteur d'origine remonte sur quatre ans." },
+            "moins deux années différentes : avec une seule année déposée, l'écran écrit « Récidivistes "+
+            "non mesurables » ; avec deux, les chroniques (trois années ou plus) ne le sont pas "+
+            "encore. Le moteur d'origine remonte sur quatre ans." },
     { t:"Corrections de stock — du {debM} au {finM}, tous motifs",
       ou:"Espace Corrections de Stock → Liste des corrections → Imprimer → « Imprimer le(s) correction(s) »",
       piege:"Exporter APRÈS la saisie des corrections du mois. Sorti trop tôt, le fichier ne "+
@@ -6029,17 +6122,44 @@ const GROUPES = [
             "rapprochement refuse de conclure, quel que soit le nombre de classeurs déposés. "+
             "DEUX EXPORTS DONC, depuis le même écran : le détail ET la liste." },
     { t:"Les relevés de quinzaine des grossistes — Q1 du {q1a} au {q1b}, Q2 du {q2a} au {finM}",
-      ou:"documents transmis par les grossistes" },
+      ou:"documents transmis par les grossistes",
+      // 01/10/2026 : jusqu'en août, un script renommait ces relevés en coulisses ; sans lui, rien
+      // ne disait qu'ils devaient l'être. L'application les lit désormais à leur contenu.
+      piege:"Les déposer TELS QUE REÇUS, sans les renommer : l'application lit dans chaque "+
+            "document le grossiste et sa période (« du … au … », ou la date de ses BL). Il en faut "+
+            "HUIT — quatre grossistes, deux quinzaines chacun. S'il en manque un, le taux de "+
+            "rapprochement n'est pas publié, et l'application dit lequel ; de même si deux relevés "+
+            "différents se disputent une quinzaine, ou si les périodes imprimées (DPCI, TEDIS) "+
+            "laissent des jours sans relevé. Les dates de coupure varient d'un grossiste à l'autre : "+
+            "c'est la fin du relevé qui compte. Un relevé d'un autre mois est écarté." },
   ]},
   { num:"6", titre:"Réclamations", kpi:["reclamations"], pieces:[
     { t:"Liste des réclamations DÉTAIL — émises du {debM} au {finM}",
       ou:"Espace Fournisseurs → Liste des Réclamations → Imprimer → « Imprimer le(s) réclamations »",
       piege:"La « liste des réclamations sélectionnées » n'a ni date d'émission ni motif : elle "+
-            "est écartée. Il faut la sortie qui montre le détail produit avec les motifs.",
+            "est écartée. Il faut la sortie qui montre le détail produit avec les motifs. "+
+            "Le taux d'un mois n'est DÉFINITIF que 60 jours après : c'est le délai laissé au "+
+            "grossiste pour créditer chaque réclamation. Déposé au début du mois suivant, il sort "+
+            "« non publiable — provisoire » tant qu'une réclamation récente attend encore son "+
+            "avoir, et l'application dit avant quelle date il ne peut pas l'être. Pour le "+
+            "mesurer, redéposer la liste de ce mois avec TOUS les relevés de quinzaine reçus "+
+            "depuis, sans en sauter un, et le PDF de chaque avoir DPCI qu'ils listent : s'il en "+
+            "manque un entre deux pièces déposées, le taux reste non publiable et l'application "+
+            "dit lequel.",
       img:"guide/reclamations-detail.webp" },
-    { t:"Les récapitulatifs d'avoirs des grossistes du mois",
-      ou:"documents transmis par les grossistes",
-      piege:"Un avoir qui solde une réclamation ancienne est NORMAL : le rapprochement est cumulatif." },
+    // 01/10/2026 : cette pièce demandait « les récapitulatifs d'avoirs des grossistes », qu'aucun
+    // module ne lit, et taisait les deux sources d'avoirs que le module des réclamations lit
+    // vraiment en plus des relevés : les avoirs DPCI à l'unité et les exports du portail COPHARMED.
+    { t:"Les avoirs DPCI du mois — un PDF par avoir, « BR VALORISE N° R… » — et les exports d'avoirs du portail COPHARMED",
+      ou:"documents transmis par les grossistes (portail en ligne pour COPHARMED)",
+      piege:"Rien de plus pour UBIPHARM et TEDIS : leurs avoirs sont lus sur les relevés de "+
+            "quinzaine (groupe 5). Le « Récapitulatif des avoirs » UBIPHARM n'est PAS lu — il donne "+
+            "le numéro de chaque avoir, jamais celui du bon de livraison réclamé : inutile de le "+
+            "déposer. Pour DPCI, chaque avoir listé sur ses relevés de quinzaine est attendu en PDF, "+
+            "sauf les ristournes de fin de mois marquées « (R) » : tant qu'il en manque un, une "+
+            "réclamation DPCI sans avoir de la même période ne peut pas être comptée non traitée — "+
+            "le taux reste non publiable, et l'application dit lequel. Un avoir qui solde une "+
+            "réclamation ancienne est NORMAL : le rapprochement est cumulatif." },
   ]},
   { num:"7", titre:"Registre de régularisation du stock", kpi:[], pieces:[
     { t:"L'onglet du mois du registre de régularisation",
@@ -6125,12 +6245,21 @@ const GROUPES_TRESORERIE = [
       // Le MÊME écran que T4 : seule la plage de dates change. Établi sur capture le 31/08/2026.
       ou:"Espace Facturation et compte client → onglet « Gestion des Comptes Clients » → "+
          "« Journée du » au 01/01 d'il y a trois ans, « au » aujourd'hui → « > Imprimer la liste »",
+      // « Le BFR s'en sert aussi » était devenu FAUX le 01/10/2026 : le BFR ne lit plus que la
+      // liste des factures émises DU MOIS analysé, jamais l'extrait des soldes (module-bfr.js,
+      // PIECES_VUES). Le Gérant qui déposait l'extrait pour le BFR aurait vu ses créances
+      // ESTIMÉES sans comprendre pourquoi. La pièce qu'il lit est nommée ici, en clair.
       piege:"Colonnes indispensables : Montant Total, Règlement, Solde. Il faut au moins "+
             "18 mois d'historique et 200 factures pour le RECOUVREMENT, qui sinon ne la "+
             "reconnaît pas. Sans elle les taux sortent quand même, mais la balance âgée n'est "+
-            "PAS produite : elle ne se déduit pas d'une soustraction. Le BFR s'en sert aussi, "+
-            "avec moins d'exigences — sans elle, il ESTIME les créances à 2 × le crédit "+
-            "mensuel et le dit partout." },
+            "PAS produite : elle ne se déduit pas d'une soustraction. Le BFR, lui, ne la lit "+
+            "PAS : ses créances se lisent sur la liste des factures émises PENDANT le mois "+
+            "analysé — même écran, « Journée du » le 1er du mois « au » dernier jour du mois. "+
+            "Sans cette liste, il ESTIME les créances à 2 × le crédit mensuel et le dit, sur "+
+            // 4e passe (02/10/2026) : sans la liste, un crédit introuvable ou illisible n'est plus
+            // estimé à 0 F — le BFR n'est pas calculé (module-bfr.js). Le guide le dit.
+            "la carte comprise ; si la ligne « Total crédits » du rapport d'activité est "+
+            "introuvable ou illisible, il n'estime rien et le BFR n'est pas calculé." },
   ]},
   { num:"3", titre:"Documents de l'officine et des tiers", kpi:["versements"], pieces:[
     { ref:"T6", src:"officine",
@@ -6161,24 +6290,85 @@ const GROUPES_TRESORERIE = [
     { ref:"T12", src:"officine",
       t:"Le journal de banque des cinq comptes, tenu jusqu'au {finM}",
       ou:"tenu par l'officine (« Banque 2026.xlsx »)",
-      piege:"DEUX PIÈGES. (1) Le taux mesure la TENUE DU JOURNAL, pas le pointage : un journal "+
+      /* 01/10/2026 — TROIS PIÈGES. Le renvoi « la ressaisir une fois dans la fiche » ne disait
+         pas OÙ : la clé se saisit dans le panneau « Le mot de passe du journal de banque » de
+         l'onglet « Déposer les fichiers » (constat (d) de la contre-expertise). Et une vieille
+         copie en clair passait devant le journal à jour (constat (b)) : c'est désormais le plus
+         récent qui est lu, et le pôle le dit. */
+      piege:"TROIS PIÈGES. (1) Le taux mesure la TENUE DU JOURNAL, pas le pointage : un journal "+
             "arrêté au 5 du mois donne un taux effondré qui n'accuse pas le rapprochement mais "+
             "le journal lui-même — c'est ce qui s'est produit en août 2026 (17 écritures pour "+
             "163 lignes de relevé côté SIB). (2) Le fichier est CHIFFRÉ, et l'application "+
             "l'ouvre elle-même avec la clé enregistrée dans la fiche de l'officine — elle ne la "+
-            "demande jamais à l'écran et ne l'écrit nulle part. Deux conséquences à connaître : "+
-            "une fiche restaurée depuis une sauvegarde téléchargée ne porte PAS cette clé (elle "+
-            "n'y est jamais recopiée), il faut la ressaisir une fois dans la fiche ; et si la "+
+            "demande jamais dans un message et ne l'écrit nulle part. La clé se saisit UNE FOIS, "+
+            "dans le panneau « Le mot de passe du journal de banque », sur l'onglet « Déposer les "+
+            "fichiers » du pôle Trésorerie. Une fiche restaurée depuis une sauvegarde, ou ouverte "+
+            "sur un autre poste, ne porte PAS cette clé : la ressaisir dans ce panneau ; et si la "+
             "protection du classeur est changée à l'officine, l'application le dit nommément au "+
-            "lieu de rendre l'indicateur non mesuré sans explication." },
+            "lieu de rendre l'indicateur non mesuré sans explication. (3) Déposer UNE SEULE copie "+
+            "du journal, la plus récente : si plusieurs sont déposées, c'est celle enregistrée en "+
+            "dernier qui est lue, et le journal de traitement nomme celles qui sont écartées — une "+
+            "vieille copie « sans mot de passe » ne passe plus devant le journal à jour." },
+    /* T13 RÉÉCRITE LE 01/10/2026 (constats (a), (c) et (e) de la contre-expertise). Elle
+       promettait qu'« un compte sans mouvement ni écriture au journal ne pénalise pas » alors que
+       le moindre relevé manquant arrêtait tout le calcul ; elle ne disait ni comment nommer le
+       fichier, ni qu'un relevé doit couvrir le mois entier. Le texte suit désormais le module.
+       2e TOUR, MÊME JOUR. La règle (3) promettait « jamais compté à 0 % » quand le module
+       comptait encore 0 % un relevé dont toutes les lignes étaient à une semaine au plus du mois
+       — la vue « mois en cours » téléchargée début octobre, que ce même guide faisait télécharger
+       « APRÈS la fin du mois ». Le module tient désormais la promesse ; le guide dit de choisir
+       la période du 1er au dernier jour (pas la vue « mois en cours »), nomme la seule exception
+       et le seuil exact du relevé arrêté.
+       4e passe (02/10/2026), deux textes faux relevés par la 3e contre-vérification. (1) « pour une
+       vue « 30 derniers jours » ou « mois en cours », une seule écriture hors de sa plage suffit » :
+       le module ne reconnaît une vue qu'à une ligne APRÈS le mois ou à plus d'une semaine AVANT le
+       1er ; une vue « mois en cours » arrêtée avant la fin du mois n'a que le seuil ordinaire — un
+       relevé coupé au 21/09 sort SIB à 66,4 au lieu de 92,6, publiable. Le texte dit désormais
+       exactement ce que fait le module (etatTenue, couvertureDuReleve), seuil ordinaire compris
+       (« la dernière à plus d'une semaine », pas « deux écritures à plus d'une semaine ») ;
+       durcir la règle est une décision du Directeur Général. (2) Le relevé vide ou illisible,
+       quand c'est lui qui est retenu pour son compte (calculer(), « LE RELEVÉ COUVRE-T-IL LE
+       MOIS ? »), rend le taux non publiable aussi pour un compte SANS écriture au journal (module,
+       « LES RÉSERVES ») ; un fichier illisible écarté au profit d'un relevé lu n'arrête rien, et
+       le texte ne promet plus le contraire. */
     { ref:"T13", src:"tiers",
-      t:"Les relevés bancaires du mois, UN PAR COMPTE UTILISÉ",
-      ou:"espaces en ligne des banques de l'officine",
+      t:"Les relevés bancaires du {debM} au {finM}, UN PAR COMPTE de l'onglet du mois du journal",
+      ou:"espaces en ligne des banques de l'officine — période « du 1er au dernier jour du mois », "+
+         "téléchargée APRÈS la fin du mois (jamais la vue « mois en cours »)",
       piege:"UN RELEVÉ QUI MANQUE NE SE VOIT QU'AU CALCUL, c'est-à-dire trop tard. En août "+
             "2026, deux relevés absents ont fait tomber le taux de rapprochement à 13,9 % : "+
-            "une fois déposés, il était de 94,5 %. Déposer un relevé par compte RÉELLEMENT "+
-            "UTILISÉ dans le mois — un compte sans mouvement ni écriture au journal ne "+
-            "pénalise pas, un compte utilisé dont le relevé manque, si." },
+            "une fois déposés, il était de 94,5 %. TROIS RÈGLES. (1) Un relevé pour CHAQUE compte "+
+            "qui a une section dans l'onglet du mois du journal, même s'il n'a pas bougé : c'est "+
+            "le relevé, et lui seul, qui prouve qu'un compte n'a pas servi. Un compte qui porte des "+
+            "écritures et dont le relevé manque arrête le calcul ; un compte SANS AUCUNE écriture "+
+            "au journal et sans relevé ne l'arrête pas, mais le taux du mois n'est alors pas "+
+            "publiable — un compte utilisé et non journalisé compte pour zéro, et rien ne dit, sans "+
+            "son relevé, qu'il n'a pas servi. (2) Le nom du fichier porte la banque et le mois, par "+
+            "exemple « RELEVE SIB SEPTEMBRE 26.pdf » — jamais la seule date d'édition "+
+            "(« … 01-10-2026 » se lit comme octobre). (3) Le relevé couvre le mois ENTIER : sur le "+
+            "site de la banque, choisir la période du 1er au dernier jour du mois, une fois le mois "+
+            "fini — pas la vue « mois en cours ». Un relevé qui ne porte AUCUNE ligne datée du mois "+
+            "n'est jamais compté à 0 % : il est refusé et nommé, et le taux n'est pas publiable sans "+
+            "le bon relevé ; si ses lignes sont à plus d'une semaine du mois alors que le compte a "+
+            "des écritures, le calcul s'arrête. Seule exception : un compte sans aucune écriture au "+
+            "journal dont le relevé porte des lignes AVANT et APRÈS le mois, et aucune entre les "+
+            "deux — il prouve que le compte n'a pas bougé ; rien à pointer, le compte reste hors du "+
+            "taux. Un relevé déposé mais vide ou illisible rend lui aussi le taux non publiable quand "+
+            "c'est lui qui est retenu pour son compte (un seul fichier par compte), que le compte ait "+
+            "des écritures ou non : sans relevé lisible, rien ne dit qu'un compte sans écriture n'a "+
+            "pas servi. Un relevé arrêté avant la fin du mois rend aussi le taux non publiable "+
+            "quand le journal porte au moins deux écritures du mois datées après sa dernière ligne, "+
+            "pour 50 000 F au moins, la dernière à plus d'une semaine de cette ligne (même règle au "+
+            "début du mois, pour un relevé qui commence après le 1er). Une seule écriture suffit "+
+            "dans deux cas seulement : le relevé porte des lignes APRÈS la fin du mois et aucune "+
+            "avant le 1er (une écriture du mois antérieure à sa première ligne), ou des lignes à "+
+            "PLUS d'une semaine avant le 1er et aucune après la fin du mois (une écriture du mois "+
+            "postérieure à sa dernière ligne). Une vue « mois en cours » arrêtée avant la fin du "+
+            "mois, ou une vue « 30 derniers jours » dont les lignes d'avant le 1er sont à une "+
+            "semaine au plus, n'a que la règle ordinaire : en deçà de son seuil, le compte est "+
+            "pointé sur ce relevé tel quel — les écritures d'après sa dernière ligne restent non "+
+            "pointées et font baisser son taux — et la fiche reste publiable si rien d'autre ne "+
+            "l'arrête. Seules les écritures DATÉES du journal comptent dans ces contrôles." },
     { ref:"T9", src:"cabinet", option:true,
       t:"justifications_versements.json — les écarts justifiés par le titulaire",
       ou:"produit par le cabinet, validé par le titulaire",
@@ -6191,25 +6381,48 @@ const GROUPES_TRESORERIE = [
 // ===========================================================================
 // LE CATALOGUE DU PÔLE PARAPHARMACIE — 2 pièces en 1 groupe (2/09/2026).
 //
-// Les DEUX pièces sont recopiées de celles du pôle Achat (état n°20, groupe 1 ; CA par
+// 4e passe (02/10/2026) : PA2 annonçait l'état n°20 « VALEUR DU STOCK A UNE DATE » comme LA
+// source de la marge. C'était faux : module-marge.js ne reconnaît que l'historique stock complet
+// (le « B1 » : PRMP, PRIX VENTE TTC et SOUS-EMPLACEMENT en ligne 1). L'état n°20 a bien ses prix
+// de vente (« Prix Vente TTC »), mais il ne porte pas les sous-emplacements (seulement les
+// emplacements, en intertitres) et ses colonnes ne sont pas en ligne 1. PA2 est donc désormais le
+// B1, avec sa règle de date.
+//
+// Les DEUX pièces sont recopiées de celles du pôle Achat (B1, groupe 1 ; CA par
 // sous-emplacement, groupe 4) — MÊME CHEMIN MÉDICIEL, MÊME PIÈGE : ce sont EXACTEMENT les
 // mêmes fichiers, republiés pour le mois demandé (aucun second export N-1 ici, à la
 // différence du groupe 4 de l'Achat : ce pôle ne fait pas de comparaison d'une année sur
 // l'autre dans le fichier lui-même, sa tendance vient de l'historique de l'officine).
 //
-// Quatre indicateurs en dépendent, mais SEULEMENT DEUX PIÈCES : performance_para et marge
-// ne lisent QUE l'état n°20 ou QUE le CA par sous-emplacement (jamais les deux à la fois) ;
+// Quatre indicateurs en dépendent, mais SEULEMENT DEUX PIÈCES : performance_para ne lit QUE
+// le CA par sous-emplacement, marge QUE le B1 (4e passe, 02/10/2026 : pas l'état n°20) ;
 // delai_ecoulement_para et peremptions_para RÉPUBLIENT ce que les modules du pôle Achat ont
 // déjà calculé sur ces mêmes fichiers (aucun calcul propre, cf. bandeau des deux modules).
 const GROUPES_PARAPHARMACIE = [
   { num:"1", titre:"Stock et chiffre d'affaires", kpi:["performance_para","marge","delai_ecoulement_para","peremptions_para"], pieces:[
+    // 5e passe (03/10/2026) : sa date se lit dans le nom de son onglet, où Médiciel l'écrit — il se
+    // sort après la fin du mois, à la date choisie ; le texte d'avant (le sortir le soir même, sans
+    // retour possible) était faux.
     { ref:"PA2", src:"mediciel",
-      t:"État n°20 « VALEUR DU STOCK A UNE DATE (DETAILLEE) » — photo au {finM}",
-      ou:"Accueil → ESPACE PHARMACIENS → « Centre Impres. » → onglet GESTION DE STOCKS",
-      piege:"Pas le n°21 RESUME : il ne porte pas le détail par produit. C'est LA source de "+
-            "l'indicateur marge, et l'une des deux sources (avec le listing des non-vendus, "+
-            "voir le pôle Achat) du stock qui dort en para.",
-      img:"guide/mediciel-stocks-1-24.webp" },
+      t:"Historique stock complet (« B1 » : sans titre, PRIX VENTE TTC et SOUS-EMPLACEMENT en "+
+        "ligne 1) — à la date du {finM}, onglet « VALEURS STOCKS - {finMnom} »",
+      ou:"Médiciel — l'historique du stock complet, par produit, tous produits et tous stocks, à "+
+         "la date choisie : Médiciel écrit cette date dans le nom de l'onglet, inutile de renommer "+
+         "le fichier",
+      piege:"C'est LA source de l'indicateur marge — pas l'état n°20 « VALEUR DU STOCK A UNE "+
+            "DATE » : il ne porte pas les sous-emplacements (seulement les emplacements, en "+
+            "intertitres) et ses colonnes ne sont pas en ligne 1. Il n'est retenu "+
+            "que s'il est l'historique du stock au DERNIER jour du mois. Il se sort après la fin du "+
+            "mois, quand vous voulez, en choisissant cette date dans Médiciel, qui l'écrit dans le "+
+            "nom de l'onglet : l'application la lit là (si l'onglet a été renommé, dans le nom du "+
+            "fichier, avec son année : « historique stock du JJ-MM-AA »). Daté d'un autre jour, il "+
+            "est refusé et nommé au journal ; sans date lisible, il est écarté de même, et la marge "+
+            "du mois n'est pas publiée. Le stock "+
+            "para qui dort le lit aussi (à défaut, il passe par l'état n°20, le TCD des ventes et "+
+            "une table qui range chaque produit dans son sous-emplacement — les pièces du groupe 1 "+
+            "du pôle Achat, si elles sont déposées ici aussi ; sans cette table, il n'est pas calculé). "+
+            "Les périmés en para le lisent aussi, à la même condition de date, pour ranger chaque "+
+            "produit périmé dans son pôle : sans lui, ils ne sont pas publiés." },
     { ref:"PA1", src:"mediciel",
       t:"CA par sous-emplacement — état n°33, du {debM} au {finM}",
       ou:"Accueil → ESPACE PHARMACIENS → « Centre Impres. » → onglet ÉTATS COMPTABLES",
@@ -6575,12 +6788,16 @@ const POURQUOI = {
     "longue sur un produit qui tourne est une recette qui n'a pas eu lieu. Suivie par "+
     "catégorie, elle dit où porter l'effort de commande en premier.",
 
+  // 4e passe (02/10/2026) : l'ancien texte décrivait une part d'écarts « élucidés » que
+  // l'indicateur ne mesure pas — le taux compte les sous-emplacements justes à 1 % près.
   ecarts_stock:
     "L'écart d'inventaire compare ce que le logiciel croit détenir et ce que le comptage a "+
-    "trouvé. Il additionne les écarts en valeur, puis les impute à une cause et à un poste. "+
-    "Ce n'est pas une accusation de vol — c'est la mesure d'une chaîne de saisie : la plupart "+
-    "des écarts viennent du déballage, du comptoir ou d'une réclamation mal soldée. Un écart "+
-    "élucidé vaut mieux qu'un écart petit : c'est la part non élucidée qui doit baisser.",
+    "trouvé, sous-emplacement par sous-emplacement : un rayon, un comptoir, un frigo. Chaque "+
+    "sous-emplacement compté est jugé juste quand son écart, manquant ou excédent, reste sous "+
+    "un pour cent de la valeur que Médiciel lui donne ; le taux est la part des "+
+    "sous-emplacements justes. Ce n'est pas la part des écarts expliqués ou régularisés — "+
+    "c'est la justesse du stock là où il est rangé, sans qu'un excédent ici efface un manquant "+
+    "là. Suivi d'un comptage à l'autre, il désigne les sous-emplacements à recompter en priorité.",
 
   conformite_saisie:
     "La conformité de saisie compare, ligne à ligne, le bon de livraison du grossiste et ce "+
@@ -6645,10 +6862,13 @@ const FORMULES = {
      "1 − (journées en rupture ÷ journées de la période suivie), par référence puis moyenne "+
      "pondérée par catégorie ABC"],
   ],
+  // 4e passe (02/10/2026) : la formule imprimée était celle d'une part d'écarts « élucidés »,
+  // que le module ne calcule pas. Voici celle qu'il calcule (module-ecarts_stock, `conf`).
   ecarts_stock: [
-    ["Taux de conformité des écarts",
-     "valeur des écarts d'inventaire élucidés (imputés à une cause et à un poste) ÷ valeur "+
-     "totale des écarts constatés au comptage verrouillé"],
+    ["Taux de conformité stock",
+     "sous-emplacements comptés dont |physique − Médiciel| reste sous 1 % de leur valeur "+
+     "Médiciel d'achat HT ÷ sous-emplacements comptés — un excédent ne compense jamais le "+
+     "manquant d'un autre sous-emplacement"],
   ],
   conformite_saisie: [
     ["Taux de conformité de saisie",
@@ -6778,6 +6998,33 @@ function vOff(d){ if(d===null||d===undefined) return "n/a"; if(d<15||d>45) retur
 function vPara(d){ if(d===null||d===undefined) return "n/a"; return d<45 ? "vert" : (d<=75 ? "orange" : "rouge"); }
 function vMort(t){ if(t===null||t===undefined) return "n/a"; return t<10 ? "vert" : (t<=15 ? "orange" : "rouge"); }
 
+/* ======== LE BARÈME DE LA PARA — 6e passe (03/10/2026), décision du DG du 03/10/2026 ========
+   Le délai d'écoulement de la PARA se juge sur le barème de la para : vert sous 45 jours, orange
+   de 45 à 75 jours, rouge au-delà de 75 jours. Les frontières sont celles de l'affichage (« <45 »,
+   « 45 à 75 », « >75 ») : 45,0 et 75,0 sont ORANGE, 44,9 est vert, 75,1 rouge. C'est vPara()
+   ci-dessus — le v_para du Mode A de Python (delai_livrables.py) —, appliquée à la valeur PUBLIÉE,
+   arrondie au dixième, celle que lit le Gérant : un délai brut de 44,96 j s'affiche « 45,0 j » et
+   se juge orange ; jugé brut, il serait vert sous un « <45 » que le chiffre affiché dément.
+   DÉFAUT D'ORIGINE. Le Mode C donnait à ventilation.para (et à ventilation_indicative.para) le
+   verdict de l'OFFICINE — verdict_delai() de delai_mode_c.py : vert de 19 à 30 j, rouge sous 15 j
+   ou au-delà de 45 j —, que le pôle Parapharmacie republiait sous « seuil_vert <45, seuil_orange
+   45 à 75, seuil_rouge >75 » : septembre 2026, 41,2 j « orange » sous « vert si < 45 » ; juillet
+   (42,8 j) et août (42,1 j), même contradiction.
+   ÉCART VOULU AU PYTHON (Mode C) : delai_mode_c.py v4.6 publie toujours « orange » pour ces trois
+   mois. Il est déclaré, au caractère près, dans les bancs qui comparent à Python ou au livrable
+   remis (test_listing_sous_emplacement.js, test_module_delai_c_2026-07.js,
+   test_note_delai_2026-08.js). Le Mode A suivait déjà ce barème, comme Python : il ne change pas.
+   Le verdict de l'officine et celui du global ne changent pas.
+   verdictParaC() : la même règle, null pour un délai inconnu — comme verdict_delai() de Python au
+   Mode C (le Mode A écrit "n/a"). Exposée en bas de ce bloc (KemetBaremePara) pour l'écran par
+   indicateur et la note du délai de l'Achat, et pour la carte de la Parapharmacie, qui jugent avec
+   elle : une seule règle.
+   LES MOIS DÉJÀ ENREGISTRÉS NE SONT PAS RÉÉCRITS : une fiche calculée avant le 03/10/2026 garde
+   son verdict jusqu'au prochain calcul du mois, et l'écran, la note et la carte qui le montrent le
+   DISENT.
+   Éprouvé par _tests/test_bareme_para.js (--degrade). */
+function verdictParaC(dpPublie){ return (dpPublie===null||dpPublie===undefined) ? null : vPara(dpPublie); }
+
 // pyStr : interpolation Python d'une valeur déjà arrondie par round(x,1) (delai_livrables.py
 // passe do/dp/tm/r["delai"] tels quels dans ses f-strings). Python affiche TOUJOURS la décimale
 // — "81.0j", "0.0%" — là où String(81) en JS la perd. Même correctif que pyStr() du bloc
@@ -6872,9 +7119,281 @@ function parseNonVendus3m(rows){
   return codes;
 }
 
+/* ====== LA PHOTO DE LA FIN DU MOIS : UNE RÈGLE, DEUX PIÈCES — 4e passe (02/10/2026) ======
+   La règle posée le 01/10/2026 pour l'état n°20 du Mode C (« LA PHOTO DOIT ÊTRE CELLE DE LA FIN
+   DU MOIS ANALYSÉ », plus bas) est SORTIE du Mode C, telle quelle, pour juger aussi le B1 du
+   Mode A et celui de la marge de la Parapharmacie : une seule fonction décide, chaque appelant
+   écrit son motif. Une photo datée dt = {y, m, d} est refusée :
+     - « pas-fin-de-mois » : elle n'est pas datée du DERNIER jour d'un mois — le 1er du mois
+       suivant compris, rien ne prouvant qu'elle exclut les mouvements de ce 1er ;
+     - « autre-mois » : elle est la fin d'un AUTRE mois que celui demandé à l'écran.
+   « vise » : le mois dont on attend la photo — celui de l'écran ; sans écran, celui dont elle
+   pourrait être la fin (le précédent si elle tombe le 1er).
+   CE N'EST PAS LA FENÊTRE DES RUPTURES (des dix derniers jours de M au 15 de M+1) : celle-là
+   encadre une photo qui ne porte AUCUNE date, par la rupture la plus récente qu'elle contient.
+   L'état n°20 et le B1 sont DATÉS — par Médiciel, ou par leur nom — : la date se juge telle
+   quelle, et un B1 daté du 02/10 décrit le stock du 02/10, pas celui du 30/09. 5e passe
+   (03/10/2026) : ce texte disait « sorti le 02/10 », comme si la date était celle de l'export.
+   C'est faux : Médiciel sort l'état n°20 et le B1 à la date qu'on lui choisit, le jour où on les
+   lui demande — c'est cette date-là, imprimée dans l'état n°20 et dans l'onglet du B1, qui se juge. */
+function jugerPhotoFinDeMois(dt, periodeInterface){
+  const dernier = new Date(Date.UTC(dt.y, dt.m, 0)).getUTCDate();
+  const demande = periodeInterface
+    ? {y:+periodeInterface.slice(0,4), m:+periodeInterface.slice(5,7)} : null;
+  if(dt.d !== dernier){
+    const vise = demande || (dt.d===1 ? (dt.m>1 ? {y:dt.y, m:dt.m-1} : {y:dt.y-1, m:12}) : {y:dt.y, m:dt.m});
+    return {refus:"pas-fin-de-mois", vise:vise, dernier:dernier};
+  }
+  if(periodeInterface && periodeInterface !== dt.y+"-"+String(dt.m).padStart(2,"0"))
+    return {refus:"autre-mois", vise:demande, dernier:dernier};
+  return {refus:null, vise:{y:dt.y, m:dt.m}, dernier:dernier};
+}
+
+/* ======== LE B1 : LA PHOTO DE LA FIN DU MOIS DEMANDÉ — 4e passe (02/10/2026) ========
+   DÉFAUT D'ORIGINE (contre-vérification du 02/10/2026). L'historique stock complet — le « B1 » :
+   CODE 1 … STOCK TOTAL · VM · SOUS-EMPLACEMENT en ligne 1, AUCUN titre — ne porte aucune date
+   dans ses cellules ; son NOM en porte une, donnée par l'officine, et — vu le 03/10/2026 (5e
+   passe) — le nom de son ONGLET aussi, écrit par Médiciel (voir dateDeLOnglet). Le Mode A reprenait le
+   mois de l'écran sans rien vérifier, et il passe AVANT le Mode C, dont la photo est contrôlée :
+   le B1 de juin (« MEDICIEL - HISTORIQUE STOCK DU 30-06-26.XLSX ») déposé avec les pièces de
+   septembre sortait « Septembre 2026 — 22,9 j » (35,8 j en para, 28,6 % de marge) au lieu des
+   24,7 j du Mode C vérifié. Le journal disait « Vérifiez … avant de publier ce résultat » quand
+   le résultat était déjà rangé : un texte faux. Et en juin réel, le premier B1 déposé
+   (« 120626.XLSX », photo du 12/06) passait devant celui du 30/06, que le classeur remis a lu.
+   LA RÈGLE : jugerPhotoFinDeMois() ci-dessus, celle de l'état n°20, appliquée à la date du B1.
+   OÙ SE LIT LA DATE : la mention « VALEUR DU STOCK AU » si le classeur en porte une (Médiciel
+   fait foi), sinon le NOM DE SON ONGLET, écrit par Médiciel (5e passe, 03/10/2026 : voir
+   dateDeLOnglet), sinon le NOM du fichier, AVEC son année : JJ-MM-AA, JJ-MM-AAAA, JJMMAA, JJMMAAAA,
+   AAAA-MM-JJ ou AAAAMMJJ (séparateurs - _ . / ou espace). Un nom SANS année (« 30-05 », « 1506 »
+   — l'habitude de l'officine en mai et en juin) n'est pas complété : l'année est inconnue, et
+   un inconnu n'est jamais un conforme. Aucune date, ou deux dates différentes : NON DATABLE.
+   CE QUI EN SUIT : un B1 d'un autre moment, ou non datable, est ÉCARTÉ et nommé au journal ; il
+   n'entre dans AUCUN calcul de ce module, pas même comme table code -> sous-emplacement du
+   Mode C. Le Mode C est alors essayé — sa photo est contrôlée — ; s'il ne passe pas non plus,
+   rien n'est publié et le journal dit à quelle date sortir le fichier de Médiciel (5e passe,
+   03/10/2026 : il disait « quand le sortir et comment le nommer » — l'heure de l'export n'y fait
+   rien, et le nom du fichier ne compte que si l'onglet est illisible).
+   UNE SEULE RÉPONSE PARTOUT : deux autres modules lisent ce même B1 et appellent examinerPhotoB1()
+   (KemetPhotoStock, exposé en bas de ce bloc, recopié dans la Parapharmacie) — la marge de la
+   Parapharmacie, et les périmés (module-peremptions : le rayon et le pôle de chaque produit
+   périmé, les ventes du critère FEFO), que la Parapharmacie republie. Un B1 écarté ici l'est
+   donc là aussi, table des sous-emplacements comprise : un chiffre publié sous un mois ne repose
+   jamais sur la photo d'un autre jour. Éprouvé par _tests/test_photo_b1.js (--degrade). */
+function dernierJourDuMois(y, m){ return new Date(Date.UTC(y, m, 0)).getUTCDate(); }
+function jjB1(n){ return String(n).padStart(2,"0"); }
+function dateFRB1(dt){ return jjB1(dt.d)+"/"+jjB1(dt.m)+"/"+dt.y; }
+// « de septembre 2026 », mais « d'août 2026 » et « d'octobre 2026 » — comme au Mode C.
+function deMoisB1(y, m){ const t = MOIS_AFFICHAGE[m-1]+" "+y; return (/^[aeiou]/.test(t) ? "d'" : "de ")+t; }
+// Le nom qui rend lisible le B1 de la fin du mois (y, m) : « historique stock du 30-09-26 ».
+// 5e passe (03/10/2026) : il ne sert plus que si l'onglet a été renommé (voir dateDeLOnglet).
+function nomConseilleB1(y, m){
+  return "historique stock du "+jjB1(dernierJourDuMois(y, m))+"-"+jjB1(m)+"-"+String(y).slice(-2);
+}
+// L'onglet que Médiciel écrit pour l'historique du stock de la fin du mois (y, m) :
+// « VALEURS STOCKS - 30-09-26 » (5e passe, 03/10/2026).
+function ongletConseilleB1(y, m){
+  return "VALEURS STOCKS - "+jjB1(dernierJourDuMois(y, m))+"-"+jjB1(m)+"-"+String(y).slice(-2);
+}
+/* La consigne qui accompagne tout refus : À QUELLE DATE sortir le B1. Elle sert au délai comme à
+   la marge de la Parapharmacie et aux périmés, qui lisent le même fichier.
+   5e passe (03/10/2026) — ELLE ÉTAIT FAUSSE. Elle disait de sortir le B1 le dernier jour du mois en
+   fin de journée, faute de quoi Médiciel ne saurait plus le produire, et de le renommer. Mesuré le
+   03/10/2026 : Médiciel produit l'historique du stock À UNE DATE CHOISIE, comme l'état n°20 (le DG
+   le confirme), il écrit cette date dans le nom de l'onglet, et le total VALEUR ACHAT du B1 du
+   30-06-26 égale l'état n°20 « AU 30/06 » au centime. On le sort donc APRÈS la fin du mois, quand
+   on veut, en choisissant la date ; l'application lit l'onglet : inutile de renommer le fichier.
+   Sans mois visé, l'exemple est septembre 2026. */
+function consigneB1(vise){
+  const v = vise || {y:2026, m:9};
+  const fin = dateFRB1({y:v.y, m:v.m, d:dernierJourDuMois(v.y, v.m)});
+  return "Pour servir, l'historique stock doit être celui "+(vise ? "du "+fin : "du dernier jour du mois")+
+    " : sortez-le de Médiciel quand vous voulez après la fin du mois, en choisissant "+(vise
+    ? "la date du "+fin : "cette date — par exemple le "+fin+" pour "+MOIS_AFFICHAGE[v.m-1]+" "+v.y)+
+    ". Médiciel l'écrit dans le nom de l'onglet (« "+ongletConseilleB1(v.y, v.m)+" ») et "+
+    "l'application la lit là : inutile de renommer le fichier. Si l'onglet a été renommé, la date "+
+    "se lit dans le nom du fichier, avec son année : « "+nomConseilleB1(v.y, v.m)+" ».";
+}
+// Les dates écrites dans un NOM de fichier, dans l'ordre : {y, m, d, txt, ordre}. txt : le
+// fragment du nom tel qu'il est écrit (« 30-09-26 ») ; ordre : comment il a été lu ("jma" jour,
+// mois, année ; "amj" année, mois, jour ; "jm" jour et mois). y vaut null quand le nom ne donne pas
+// l'année (« 30-05 », « 1506 ») : examinerPhotoB1() ne retient pas ces dates-là, elle les cite.
+// Un groupe de chiffres qui ne forme pas une date valide (« B1 », « (2) », « 2026 » seul, une
+// heure « 18h30 ») est ignoré.
+// Contre-vérification du 02/10/2026 : un chiffre qui PRÉCÈDE une date complète était collé à son
+// jour — « B1 2-10-26 » se lisait « 01/02/2010 » (le 1 de « B1 », puis 2 et 10). Désormais les
+// trois parties d'une date sont jointes par le MÊME séparateur ; des séparateurs mêlés
+// (« 30-09 2026 ») ne font une date que si aucune ne commence à l'un des deux groupes suivants ;
+// un jour et un mois sans année ne se lisent que si aucune date ne commence juste après ; et
+// quand deux lectures complètes se chevauchent (« B1 2 10 26 » : « 1 2 10 » et « 2 10 26 »), les
+// DEUX sont rendues — le nom est alors ambigu, et examinerPhotoB1() le refuse en les citant.
+// Un B1 bien nommé n'est jamais ambigu : un dernier jour de mois (28 à 31) n'est pas un mois.
+function datesDuNom(nom){
+  const base = String(nom||"").replace(/\.[A-Za-z0-9]{2,4}$/, "");
+  const valide = function(y, m, d){
+    if(!(m>=1 && m<=12 && d>=1)) return false;
+    if(y===null) return d <= dernierJourDuMois(2024, m);        // année inconnue : 29 février admis
+    return y>=2000 && y<=2099 && d <= dernierJourDuMois(y, m);
+  };
+  const out = [];
+  const re = /\d+(?:[-_. \/]\d+)*/g;
+  let t;
+  while((t = re.exec(base))){
+    const g = t[0].split(/[-_. \/]/);
+    const sep = t[0].match(/[-_. \/]/g) || [];                  // sep[k] : entre g[k] et g[k+1]
+    const L = function(k){ return g[k]===undefined ? 0 : g[k].length; };
+    const frag = function(i, n){ let s = g[i]; for(let k=1;k<n;k++) s += sep[i+k-1]+g[i+k]; return s; };
+    // La date en trois parties qui commence au groupe i, ou null ; « meme » : un seul séparateur.
+    const date3 = function(i, meme){
+      if(i+2 >= g.length || (meme && sep[i] !== sep[i+1])) return null;
+      const a = g[i], b = g[i+1], c = g[i+2];
+      if(L(i)<=2 && L(i+1)<=2 && (L(i+2)===2 || L(i+2)===4)){
+        const y = L(i+2)===2 ? 2000 + +c : +c;
+        if(valide(y, +b, +a)) return {y:y, m:+b, d:+a, txt:frag(i, 3), ordre:"jma"};     // JJ-MM-AA(AA)
+      }
+      if(L(i)===4 && L(i+1)<=2 && L(i+2)<=2 && valide(+a, +b, +c))
+        return {y:+a, m:+b, d:+c, txt:frag(i, 3), ordre:"amj"};                            // AAAA-MM-JJ
+      return null;
+    };
+    let i = 0;
+    while(i < g.length){
+      const a = g[i];
+      let dt = date3(i, true), pas = 3;
+      if(dt && date3(i+1, true)) pas = 1;           // deux lectures qui se chevauchent : les deux
+      if(!dt && !date3(i+1, false) && !date3(i+2, false)) dt = date3(i, false);
+      if(!dt){
+        pas = 1;
+        if(L(i)===8 && valide(+a.slice(4), +a.slice(2,4), +a.slice(0,2)))
+          dt = {y:+a.slice(4), m:+a.slice(2,4), d:+a.slice(0,2), txt:a, ordre:"jma"};       // JJMMAAAA
+        else if(L(i)===8 && valide(+a.slice(0,4), +a.slice(4,6), +a.slice(6)))
+          dt = {y:+a.slice(0,4), m:+a.slice(4,6), d:+a.slice(6), txt:a, ordre:"amj"};        // AAAAMMJJ
+        else if(L(i)===6 && valide(2000 + +a.slice(4), +a.slice(2,4), +a.slice(0,2)))
+          dt = {y:2000 + +a.slice(4), m:+a.slice(2,4), d:+a.slice(0,2), txt:a, ordre:"jma"}; // JJMMAA
+        else if(L(i)<=2 && L(i+1)>=1 && L(i+1)<=2 && !date3(i+1, false) && valide(null, +g[i+1], +a)){
+          dt = {y:null, m:+g[i+1], d:+a, txt:frag(i, 2), ordre:"jm"}; pas = 2;               // JJ-MM, sans année
+        } else if(L(i)===4 && valide(null, +a.slice(2), +a.slice(0,2)))
+          dt = {y:null, m:+a.slice(2), d:+a.slice(0,2), txt:a, ordre:"jm"};                 // JJMM, sans année
+      }
+      if(dt) out.push(dt);
+      i += pas;
+    }
+  }
+  return out;
+}
+/* 5e passe (03/10/2026) — LA DATE ÉCRITE PAR MÉDICIEL DANS LE NOM DE L'ONGLET. Médiciel nomme
+   l'onglet de l'historique du stock « VALEURS STOCKS - JJ-MM-AA » : la date du stock, celle qu'on
+   lui a choisie. Mesuré le 03/10/2026 sur les dix B1 réels de mai et de juin 2026 — « 30-06-26 »
+   dans « MEDICIEL - HISTORIQUE STOCK DU 30-06-26.XLSX », « 15-06-26 » dans « etat du
+   stock1506.XLSX », « 30-05-26 » dans « etat-stock_30-05_avecVM.xlsx » —, et le total VALEUR ACHAT
+   du B1 du 30-06-26 égale l'état n°20 « AU 30/06 » au centime. Les vingt B1 réels de janvier à
+   juin 2026 ont tous un onglet unique de cette forme ; en avril, « 010426.XLSX » porte « VALEURS
+   STOCKS - 31-03-26 », « 2104.XLSX » « 20-04-26 » et « 2804.XLSX » « 27-04-26 » : le nom, donné
+   par l'officine, et l'onglet, écrit par Médiciel, ne disent pas toujours le même jour — c'est
+   l'onglet, la date choisie dans Médiciel, qui fait foi.
+   Tolérés : les espaces autour des tirets, le tiret long (– ou —), l'année sur quatre chiffres, la
+   casse. Rend {y, m, d, txt} — txt : le nom de l'onglet tel qu'il est écrit —, ou null si l'onglet
+   n'a pas EXACTEMENT cette forme (« VALEURS STOCKS - 30-09-26 (2) », feuille dupliquée, et « Copie
+   de VALEURS STOCKS - … » non plus) ou ne forme pas une date valide : il est alors ILLISIBLE, et
+   c'est le nom du fichier qui décide (datesDuNom), comme avant. */
+function dateDeLOnglet(onglet){
+  if(typeof onglet !== "string") return null;
+  const t = onglet.replace(/[\u2013\u2014]/g, "-");
+  const r = /^\s*VALEURS\s+STOCKS\s*-\s*(\d{1,2})\s*-\s*(\d{1,2})\s*-\s*(\d{4}|\d{2})\s*$/i.exec(t);
+  if(!r) return null;
+  const y = r[3].length===2 ? 2000 + +r[3] : +r[3], m = +r[2], d = +r[1];
+  if(!(y>=2000 && y<=2099 && m>=1 && m<=12 && d>=1 && d<=dernierJourDuMois(y, m))) return null;
+  return {y:y, m:m, d:d, txt:onglet};
+}
+const ORDRE_LU_B1 = { jma:"jour, mois, année", amj:"année, mois, jour" };
+/* examinerPhotoB1(nom, rows, periode, origine, onglet) — nom : le nom du fichier déposé ; rows :
+   ses lignes (pour la mention « VALEUR DU STOCK AU ») ; periode : « AAAA-MM » du mois attendu, ou
+   rien ; origine : d'où vient ce mois — "ecran" (défaut : le délai, la marge) ou "analyse" (les
+   périmés, dont le mois est celui des corrections lues) ; onglet (5e passe, 03/10/2026) : le nom de
+   l'onglet dont viennent ces lignes, où Médiciel écrit la date du stock. Rend {ok, type:"valide"|
+   "autre-moment"|"non-datable", date, source, vise, motif, avertissement} ; le motif est une phrase
+   entière, écrite pour le journal du Gérant ; l'avertissement (ou null) dit que le nom du fichier
+   porte une autre date que l'onglet : l'onglet décide, le nom ne bloque pas — il est repris à la
+   fin du motif d'un refus, et c'est à l'appelant de l'écrire au journal quand le B1 est retenu.
+   Une date lue dans le NOM est citée avec le fragment lu et le sens de lecture (« 26-09-30 » lu
+   jour, mois, année : le 26/09/2030) : le Gérant voit ce que le code a compris. */
+function examinerPhotoB1(nom, rows, periode, origine, onglet){
+  const pi = (typeof periode==="string" && /^\d{4}-\d{2}$/.test(periode)) ? periode : null;
+  const demande = pi ? {y:+pi.slice(0,4), m:+pi.slice(5,7)} : null;
+  let dt = detecterPeriodeParEnTete(rows||[]);
+  let source = "la mention « VALEUR DU STOCK AU » du classeur";
+  // 5e passe (03/10/2026) : le nom de l'onglet, écrit par Médiciel, passe AVANT le nom du fichier.
+  // Un nom de fichier qui porte une autre date est dit (avertissement) ; il ne bloque pas.
+  let avertissement = null;
+  if(!dt){
+    const lo = dateDeLOnglet(onglet);
+    if(lo){
+      dt = lo;
+      source = "le nom de son onglet, « "+lo.txt+" », écrit par Médiciel";
+      const autres = datesDuNom(nom).filter(x=>x.d!==lo.d || x.m!==lo.m || (x.y!==null && x.y!==lo.y));
+      if(autres.length)
+        avertissement = "Le nom du fichier « "+nom+" » porte une autre date que son onglet ("+
+          autres.map(x=>"« "+x.txt+" » : "+(x.y===null ? jjB1(x.d)+"/"+jjB1(x.m) : dateFRB1(x))).join(", ")+
+          ", contre « "+lo.txt+" ») : c'est l'onglet, écrit par Médiciel, qui fait foi — l'historique "+
+          "stock est daté du "+dateFRB1(lo)+".";
+    }
+  }
+  if(!dt){
+    const lues = datesDuNom(nom);
+    const datees = [];
+    lues.filter(x=>x.y!==null).forEach(x=>{
+      if(!datees.some(u=>u.y===x.y && u.m===x.m && u.d===x.d)) datees.push(x);
+    });
+    if(datees.length !== 1){
+      const sansAnnee = lues.filter(x=>x.y===null);
+      const pourquoi = datees.length > 1
+        ? "son nom porte plusieurs dates ("+datees.map(x=>"« "+x.txt+" » : "+dateFRB1(x)).join(", ")+")"
+        : (sansAnnee.length
+          ? "son nom donne le jour et le mois ("+sansAnnee.map(x=>jjB1(x.d)+"/"+jjB1(x.m)).join(", ")+
+            ") mais pas l'année"
+          : "son nom ne porte aucune date valide");
+      // 5e passe (03/10/2026) : l'onglet est nommé quand il est connu, et le motif dit ce qui y
+      // manque VRAIMENT. « VALEURS STOCKS - 30-09-26 (2) » (feuille dupliquée) ou « Copie de
+      // VALEURS STOCKS - 30-09-26 » portent bien une date, mais pas sous la forme exacte qu'écrit
+      // Médiciel : ils ne sont pas lus — un inconnu n'est pas un conforme —, et le motif ne dit pas
+      // qu'ils n'en portent aucune. Et la consigne ne parle plus d'une heure d'export.
+      const formeMediciel = "sous la forme qu'écrit Médiciel (« VALEURS STOCKS - JJ-MM-AA »)";
+      const cellules = "ses cellules n'en donnent pas (aucune mention « VALEUR DU STOCK AU » lisible)";
+      const ailleurs = (typeof onglet==="string" && onglet)
+        ? ", le nom de son onglet (« "+onglet+" ») ne donne pas de date valide "+formeMediciel+", et "+cellules
+        : ", et "+cellules;
+      const renommer = demande ? " S'il est bien l'historique du stock au "+dateFRB1({y:demande.y,
+        m:demande.m, d:dernierJourDuMois(demande.y, demande.m)})+", renommez-le « "+
+        nomConseilleB1(demande.y, demande.m)+" » et redéposez-le — ou ressortez-le de Médiciel à "+
+        "cette date : elle sera dans le nom de son onglet." : "";
+      return {ok:false, type:"non-datable", date:null, source:"son nom", vise:demande, avertissement:null,
+        motif:"L'historique stock « "+nom+" » n'a pas de date lisible : "+pourquoi+ailleurs+
+          ". Impossible de savoir de quel jour est cette photo du stock."+renommer};
+    }
+    dt = datees[0];
+    source = "son nom, « "+dt.txt+" » lu "+ORDRE_LU_B1[dt.ordre];
+  }
+  const suite = avertissement ? " "+avertissement : "";
+  const juge = jugerPhotoFinDeMois(dt, pi);
+  if(juge.refus === "pas-fin-de-mois"){
+    const v = juge.vise;
+    return {ok:false, type:"autre-moment", date:dt, source:source, vise:v, avertissement:avertissement,
+      motif:"L'historique stock « "+nom+" » est daté du "+dateFRB1(dt)+" (date lue dans "+source+
+        "), qui n'est pas le dernier jour d'un mois : le stock "+deMoisB1(v.y, v.m)+" est celui du "+
+        dateFRB1({y:v.y, m:v.m, d:dernierJourDuMois(v.y, v.m)})+"."+suite};
+  }
+  if(juge.refus === "autre-mois"){
+    return {ok:false, type:"autre-moment", date:dt, source:source, vise:juge.vise, avertissement:avertissement,
+      motif:"L'historique stock « "+nom+" » est daté du "+dateFRB1(dt)+" (date lue dans "+source+
+        "), c'est-à-dire la fin "+deMoisB1(dt.y, dt.m)+", alors que "+(origine==="analyse"
+        ? "le mois analysé est " : "l'écran est réglé sur ")+MOIS_AFFICHAGE[juge.vise.m-1]+" "+
+        juge.vise.y+" : calculer dessus publierait un autre mois sous cette étiquette."+suite};
+  }
+  return {ok:true, type:"valide", date:dt, source:source, vise:juge.vise, motif:null, avertissement:avertissement};
+}
+
 /* ================= MODE A ================= */
 // run_delai.py — état de stock AVEC colonne VM. f1 = {nom, rows} déjà ouvert par calculer().
-function calculerModeA(f1, ouverts, cfg, log, journal){
+// photo (4e passe, 02/10/2026) : la date de la photo, DÉJÀ contrôlée par examinerPhotoB1().
+function calculerModeA(f1, ouverts, cfg, log, journal, photo){
   const header = (f1.rows[0]||[]).map(c=>U.strip(U.S(c)).toUpperCase());
   const idx=(...noms)=>{ const i=L.trouverColonne(header, noms); return i>=0?i:null; };
   // Ordre et libellés exacts — run_delai.py:65-83 (rapport Mode A §2, cité littéralement).
@@ -6909,26 +7428,15 @@ function calculerModeA(f1, ouverts, cfg, log, journal){
   }
   log("ok", f1.nom+" — état de stock avec VM reconnu (Mode A), "+rows.length+" ligne(s) produit lue(s).");
 
-  let periodeDetectee = detecterPeriodeParEnTete(f1.rows);
-  let periodeDepuisSelecteur = false;
-  if(!periodeDetectee && cfg._periodeInterface){
-    // Repli n°2 (16/08/2026, Étape 3) : reprendre le mois choisi par l'utilisateur dans le
-    // sélecteur d'interface AVANT le dépôt. Jamais une valeur devinée depuis les données —
-    // c'est un choix affirmatif déjà fait. Journalisé explicitement, jamais en silence.
-    const [py, pm] = cfg._periodeInterface.split("-").map(Number);
-    periodeDetectee = {y:py, m:pm, d:1};
-    periodeDepuisSelecteur = true;
-  }
-  if(periodeDepuisSelecteur){
-    log("warn", "Période non détectée dans "+f1.nom+" (aucune mention « VALEUR DU STOCK AU ») : "+
-      "reprise du sélecteur d'interface ("+cfg._periodeInterface+"). Vérifiez que ce fichier "+
-      "correspond bien au mois sélectionné avant de publier ce résultat.");
-  } else if(!periodeDetectee){
-    log("warn", "Période non détectée automatiquement dans "+f1.nom+" (aucune mention "+
-      "« VALEUR DU STOCK AU » trouvée) et aucune période sélectionnée dans l'interface : "+
-      "periode_analysee sera laissée vide — ATTENTION, ce KPI sera alors EXCLU de la synthèse "+
-      "du mois (matchPeriod ne peut pas le rattacher à une période).");
-  }
+  // 4e passe (02/10/2026) — LA DATE DE LA PHOTO EST ÉTABLIE ET CONTRÔLÉE AVANT L'APPEL (voir « LE
+  // B1 : LA PHOTO DE LA FIN DU MOIS DEMANDÉ ») : plus de repli sur le mois de l'écran, plus de
+  // période laissée vide. L'ancien avertissement « Vérifiez que ce fichier correspond bien au mois
+  // sélectionné avant de publier ce résultat » était faux : le résultat était déjà rangé.
+  const periodeDetectee = photo.date;
+  log("ok", "Photo du stock au "+dateFRB1(photo.date)+" (date lue dans "+photo.source+") : c'est bien "+
+    "la fin "+deMoisB1(photo.date.y, photo.date.m)+(cfg._periodeInterface ? ", le mois demandé à l'écran" : "")+".");
+  // 5e passe (03/10/2026) : un nom de fichier qui porte une autre date que l'onglet est dit ici.
+  if(photo.avertissement) log("warn", photo.avertissement);
 
   // Exclusion CMU — run_delai.py:125, substring sur EMPLACEMENT RAYON (rapport Mode A §4).
   const act = rows.filter(p=>p.rayon.indexOf("CMU")<0);
@@ -7004,7 +7512,10 @@ function calculerModeA(f1, ouverts, cfg, log, journal){
   // L107 : if vo=="rouge" and do<15: pfa.append(f"Officine {do}j < 15j — sous-stockage, risque de rupture")
   if(vo==="rouge" && doVal<15) pointsFaibles.push("Officine "+pyStr(doVal)+"j < 15j — sous-stockage, risque de rupture");
   // L108 : if vp in ("orange","rouge"): pfa.append(f"Para {dp}j — rotation lente (>{'75' if vp=='rouge' else '45'}j)")
-  if(vp==="orange"||vp==="rouge") pointsFaibles.push("Para "+pyStr(dpVal)+"j — rotation lente (>"+(vp==="rouge"?"75":"45")+"j)");
+  // 6e passe (03/10/2026) — ÉCART VOULU AU PYTHON, D'UN CARACTÈRE : l'orange écrit « (≥45j) », et non
+  // « (>45j) ». La para à 45,0 j est orange (« 45 à 75 », voir « LE BARÈME DE LA PARA ») : « rotation
+  // lente (>45j) » y était faux. Le rouge garde « (>75j) », vrai pour tout rouge.
+  if(vp==="orange"||vp==="rouge") pointsFaibles.push("Para "+pyStr(dpVal)+"j — rotation lente ("+(vp==="rouge"?">75":"≥45")+"j)");
   // L109 : if tm is not None and vm!="vert": pfa.append(f"Stock mort officine {tm}% — {nb_dorm} dormants, {NF(val_dorm)} FCFA immobilisés")
   if(tauxMort!==null && vm!=="vert") pointsFaibles.push("Stock mort officine "+pyStr(tauxMort)+"% — "+
     nbDorm+" dormants, "+NF(valOffDorm)+" FCFA immobilisés");
@@ -7111,7 +7622,9 @@ function parseTcd(rows){
       i += 1;
     }
   }
-  return { data:data, nbLignes:Object.keys(data).length };
+  // `colonnes` (01/10/2026) : les mois que le TCD contient VRAIMENT. Sans elle, un mois absent
+  // se lisait comme un mois sans vente (q[k]||0) — cf calculerModeC.
+  return { data:data, nbLignes:Object.keys(data).length, colonnes:colsEntries.map(e=>e[0]) };
 }
 
 function trouverEnTeteCodeProduit(rows){
@@ -7135,7 +7648,8 @@ function trouverEnTeteCodeProduit(rows){
 // différemment (ex. dG brut=18.96 -> "orange" côté Python, "vert" si évalué sur round(18.96,1)=19.0).
 // Et contrairement à vOff() qui renvoie la chaîne "n/a" quand d est nul, verdict_delai() renvoie
 // littéralement None (donc null en JSON) — appeler CETTE fonction (jamais vOff) partout où le
-// Mode C calcule un verdict de délai (global, officine, para).
+// Mode C calcule un verdict de délai (global, officine). La para, depuis la 6e passe (03/10/2026),
+// se juge sur SON barème : verdictParaC(), voir « LE BARÈME DE LA PARA ».
 function verdictDelaiC(d){
   if(d===null||d===undefined) return null;
   if(d<15||d>45) return "rouge";
@@ -7154,7 +7668,8 @@ function verdictMortC(t){
   return "orange";
 }
 
-// delai_mode_c.py — état de stock SANS VM + TCD des ventes + table pôle (repli v5 uniquement).
+// delai_mode_c.py — état de stock SANS VM + TCD des ventes + table pôle (listing des produits,
+// état n°22 ou écran FOURNISSEUR, sinon repli v5 — 5e passe, 03/10/2026).
 // Rend null si le Mode C n'est pas reconnu (bascule vers l'erreur globale de calculer()).
 function calculerModeC(ouverts, cfg, log, journal){
   // ---- Fichier stock (sans VM) : en-tête "CODE PRODUIT" ET période, testés ENSEMBLE, sur TOUS
@@ -7169,8 +7684,8 @@ function calculerModeC(ouverts, cfg, log, journal){
   // LA MÊME boucle sur chaque candidat, avec `continue` (jamais d'abandon anticipé), et écrase
   // `best` à chaque candidat qui passe les deux — dernier trouvé gagne, pas le premier. Écart de
   // PORTAGE corrigé ici (pas une exception de fidélité : le Python ne fait jamais ça).
-  // N'ajoute PAS le 3e test Python (rejet si le mois extrait ne correspond pas au mois ciblé) —
-  // périmètre du correctif limité par décision DG.
+  // Le 3e test Python (rejet si le mois extrait ne correspond pas au mois ciblé), longtemps laissé
+  // de côté, est porté depuis le 01/10/2026 — voir « LA PHOTO DOIT ÊTRE CELLE DE LA FIN DU MOIS ».
   let stockFile=null, stockHeaderIdx=-1, periodeC=null, auMoinsUnEnTeteCodeProduit=false;
   for(const o of ouverts.slice().sort((a,b)=>a.nom.localeCompare(b.nom,"en"))){
     const hi = trouverEnTeteCodeProduit(o.rows);
@@ -7215,6 +7730,67 @@ function calculerModeC(ouverts, cfg, log, journal){
   const y = periodeC.y, mo = periodeC.m;
   const pmMo = mo>1 ? mo-1 : 12, pmY = mo>1 ? y : y-1;
 
+  /* ---- LA PHOTO DOIT ÊTRE CELLE DE LA FIN DU MOIS ANALYSÉ (01/10/2026) ----
+     DÉFAUT D'ORIGINE (contre-expertise du 01/10/2026). Le mois venait de la date imprimée sur
+     l'état n°20, sans aucun contrôle, et la VM se lit dans les colonnes M et M-1 du TCD, une
+     colonne absente valant 0. Une photo prise « au 31/10/2026 » (le guide resté sur octobre) ou
+     « au 01/10/2026 » (le jour de l'export), avec le TCD de septembre, donnait donc « Octobre
+     2026 — 37,1 jours, orange » au lieu de « Septembre 2026 — 22,2 jours, vert » : la VM était
+     divisée par deux faute de colonne d'octobre. Trois refus, chacun avec son motif :
+       1. la photo n'est pas datée du DERNIER jour d'un mois. Y compris le 1er du mois suivant :
+          rien ne prouve que l'état « au 01/10 » exclut les mouvements du 01/10 (les deux seules
+          photos jumelles du client, au 30/04 et au 01/05/2026, sont identiques — mais le 01/05
+          est férié, ce qui ne prouve rien). Ressortir l'état « au 30/09 » coûte une minute ;
+       2. la photo est la fin d'un AUTRE mois que celui demandé à l'écran — le 3e test de
+          controle_periode.py (« FICHIER 1 HORS PERIODE »), que ce port avait laissé de côté ;
+       3. le TCD ne contient pas les colonnes de M et de M-1 : la VM serait calculée sur des
+          ventes manquantes comptées pour zéro. */
+  {
+    const NOMS = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre",
+                  "octobre","novembre","décembre"];
+    const lib = (yy, mm)=>NOMS[mm-1]+" "+yy;
+    const de = (t)=>(/^[aeiou]/.test(t) ? "d'" : "de ")+t;   // « d'août », « d'octobre »
+    const j2 = (n)=>String(n).padStart(2,"0");
+    const dateTxt = j2(periodeC.d)+"/"+j2(mo)+"/"+y;
+    const dernier = new Date(Date.UTC(y, mo, 0)).getUTCDate();
+    let motif = null;
+    // 4e passe (02/10/2026) : la décision est rendue par jugerPhotoFinDeMois(), que le B1 du Mode A
+    // appelle aussi (« LA PHOTO DE LA FIN DU MOIS : UNE RÈGLE, DEUX PIÈCES ») ; les motifs, propres
+    // à l'état n°20, restent écrits ici, à l'identique.
+    const juge = jugerPhotoFinDeMois(periodeC, cfg._periodeInterface);
+    if(juge.refus === "pas-fin-de-mois"){
+      // Le mois dont cette photo pourrait être la fin : le précédent si elle tombe le 1er.
+      const vise = juge.vise;
+      const finVise = j2(new Date(Date.UTC(vise.y, vise.m, 0)).getUTCDate())+"/"+j2(vise.m)+"/"+vise.y;
+      motif = "L'état du stock (état n°20, « "+stockFile.nom+" ») est daté du "+dateTxt+", qui "+
+        "n'est pas le dernier jour d'un mois. Le délai d'écoulement "+de(lib(vise.y, vise.m))+" se "+
+        "calcule sur le stock du "+finVise+" : ressortez l'état n°20 « au "+finVise+" » (Centre "+
+        "Impres. → GESTION DE STOCKS) et redéposez-le.";
+    } else if(juge.refus === "autre-mois"){
+      const dm = cfg._periodeInterface;
+      motif = "L'état du stock (« "+stockFile.nom+" ») est la photo du "+dateTxt+", c'est-à-dire "+
+        "la fin "+de(lib(y, mo))+", alors que l'écran est réglé sur "+lib(+dm.slice(0,4), +dm.slice(5,7))+
+        ". Calculer dessus publierait un autre mois sous l'étiquette du mois demandé. Choisissez "+
+        "le bon mois en haut de l'écran, ou déposez l'état n°20 de la fin du mois demandé.";
+    } else {
+      const manquants = [[y, mo], [pmY, pmMo]].filter(p=>tcd.colonnes.indexOf(p[0]+"-"+p[1])<0);
+      if(manquants.length){
+        motif = "Le TCD des ventes (« "+tcdFile.nom+" ») ne contient pas "+
+          manquants.map(p=>lib(p[0], p[1])).join(" ni ")+". La vitesse de vente se calcule sur "+
+          lib(pmY, pmMo)+" et "+lib(y, mo)+" : sans "+(manquants.length>1?"ces mois":"ce mois")+
+          ", elle serait comptée pour zéro et le délai serait faux. Réexportez le TCD des ventes "+
+          "jusqu'au "+j2(dernier)+"/"+j2(mo)+"/"+y+".";
+      }
+    }
+    if(motif){
+      log("err","DÉLAI D'ÉCOULEMENT NON CALCULÉ — "+motif+" Rien n'est publié.");
+      return {erreur:true, journal:journal};
+    }
+    log("ok","Photo du stock au "+dateTxt+" : c'est bien la fin "+de(lib(y, mo))+
+      (cfg._periodeInterface ? ", le mois demandé à l'écran" : "")+", et le TCD contient "+
+      lib(pmY, pmMo)+" et "+lib(y, mo)+".");
+  }
+
   // ---- Colonnes du fichier stock (rapport Mode C §1) ----
   const headerC = (stockFile.rows[stockHeaderIdx]||[]).map(c=>U.strip(U.S(c)).toUpperCase());
   const idxC=(...noms)=>{ const i=L.trouverColonne(headerC,noms); return i>=0?i:null; };
@@ -7247,38 +7823,150 @@ function calculerModeC(ouverts, cfg, log, journal){
   // sur les données réelles — constaté le 16/09/2026 en instruisant un écart de 975 739 F qui
   // s'est avéré venir d'une vérité de banc régénérée avec un autre jeu de fichiers.
   // Python essaie cette variante D'ABORD, le repli v5 ensuite : même ordre ici.
-  let mapping = {}, mappingFile=null;
-  function lireListingFournisseur(o){
-    const platCells = [];
-    for(let i=0;i<Math.min(8,o.rows.length);i++){
-      for(const c of (o.rows[i]||[])){
-        if(c!==null && c!==undefined && c!=="") platCells.push(sa(c));
-      }
+  /* ====== L'ÉTAT N°22 ET LE CHOIX ENTRE PLUSIEURS LISTINGS — 5e passe (03/10/2026) ======
+     DÉFAUT D'ORIGINE (mesuré le 03/10/2026 sur le dossier brut de septembre). Médiciel sort la
+     table des rayons par l'état n°22 « LISTING DES PRODUITS PAR EMPLACEMENT/SOUS-EMPLACEMENT » :
+     bandeau, titre, critères, puis des blocs — une ligne « SOUS-EMPLACEMENT : <SE> » en colonne A
+     (« EMPLACEMENT : <rayon> » en colonne C), l'en-tête « Code 1 | Produit | … », les produits,
+     et des lignes de COMPTAGE (un nombre seul en colonne A : « 3 », « 1832 », « 7007 »). Ce port
+     ne lisait que l'écran à blocs « FOURNISSEUR : » : en septembre, couverture 0 %, ventilation
+     officine/para NON PUBLIÉE, délai para NON CALCULÉ (Parapharmacie), stock mort officine NON
+     PUBLIÉ — quand Python v4.6, sur les mêmes pièces, publie 23,4 j à l'officine et 41,2 j en para.
+     PORT LITTÉRAL de delai_mode_c.py v4.6 :
+       - _lire_listing() (l.203-237) : « LISTING DES PRODUITS » dans les 8 premières lignes ; l'écran
+         « SOUS-EMPLACEMENT » est reconnu AVANT « FOURNISSEUR » ; une ligne de MOINS DE TROIS
+         cellules ne porte jamais un code (les comptages, les pieds de page), ni une ligne dont la
+         colonne A commence par CODE, TOTAUX, EDITE ou LISTING. Ce filtre des comptages manquait
+         aussi à l'écran FOURNISSEUR : en août, le comptage « 70 » du bloc TABLEAU DOULEUR y
+         rangeait le code « 70 » (une cire à os, dont la ligne est sous PETIT MAT FILS DE SUTURE),
+         et le comptage « 2 » du bloc VETO ACCESSOIRES le code « 2 » (une tasse de la para) — à
+         l'officine. Python v4.6 les écarte : juillet et août s'alignent sur lui. CE QUI CHANGE
+         DONC SUR CES DEUX MOIS PASSÉS, voulu et mesuré le 03/10/2026 (module seul, sur les dossiers
+         bruts, avant puis après) — mai et juin sont identiques à l'octet :
+           juillet : délai para 42,7 -> 42,8 j (Achat et pôle Parapharmacie ; officine 21,4 j et
+             global 23,3 j inchangés) ; six lignes « par rayon » — PETIT MAT FILS DE SUTURE 35 -> 36
+             réf, TABLEAU DOULEUR 35 -> 34, MED VL ANTI PALUSTRE 2 -> 1, PARA COUCHE BEBE 2 -> 3,
+             « (hors table de mapping) » 2 -> 3 (le code « 3 », que le comptage « 3 » rangeait sous
+             MED VL ANTI PALUSTRE, n'a aucune ligne produit au listing de juillet : il n'est plus
+             ventilé, comme chez Python, et la liste « non ventilé » des rotations lentes du
+             classeur passe de 2 à 3 lignes), et la ligne VETO ACCESSOIRES disparaît (91 -> 90
+             lignes) ; pct_du_rayon de trois lignes du stock mort par rayon (PARA COUCHE BEBE
+             47,9 -> 45,5, TABLEAU DOULEUR 0,9 -> 1,0, VETO ACCESSOIRES 69,2 -> 100) ; la base de
+             l'officine, stock_mort_3m.par_pole.OFFICINE.total_pole (et total_officine du
+             classeur), 33 949 683 -> 33 946 417 F — la base de Python v4.6 —, taux inchangé à
+             19,9 % ;
+           août : deux lignes « par rayon » (PETIT MAT FILS DE SUTURE 38 -> 39 réf, 62,7 -> 62,5 j ;
+             TABLEAU DOULEUR 29 -> 28 réf, 17,2 -> 16,6 j) ; pct_du_rayon de deux lignes du stock
+             mort par rayon (VETO ACCESSOIRES 69,2 -> 100, PARA COUCHE BEBE 65,1 -> 60,9) ; la base
+             de l'officine 32 879 472 -> 32 877 163 F (celle de Python v4.6), taux inchangé à
+             22,2 %. Aucun indicateur publié ne change en août ;
+           juillet et août : sources.mapping_date passe de null à la date « édité le » du listing ;
+       - _date_edition() (l.194-201) : la mention « édité le JJ/MM/AAAA » des 6 dernières lignes ;
+       - lire_mapping() (l.239-306) : entre plusieurs listings, le plus récent « édité le » (sans
+         date lisible : le dernier de tous), puis le nom de fichier en minuscules, en ordre
+         décroissant — l'ordre de dépôt n'y est pour rien. Le repli CODE 1 + SOUS-EMPLACEMENT
+         ne sert que sans listing.
+     ADAPTATION NÉCESSAIRE : Python ne cherche que dans INPUT/AAAA-MM du mois, puis du mois
+     précédent ; ce port ne voit que le lot déposé — tous les listings déposés concourent.
+     UN CODE SOUS DEUX SOUS-EMPLACEMENTS : comme chez Python (`mp[code] = cur`), la dernière ligne
+     lue l'emporte. Ce n'est pas tu : le journal nomme le code, chaque ligne (sous-emplacement et
+     libellé), le produit que le stock range sous ce code, dit où il est rangé et ce qui en dépend
+     — selon ce que fait ce produit, une fois le calcul fait (voir « UN CODE SOUS PLUSIEURS
+     SOUS-EMPLACEMENTS », plus bas). Septembre réel : le code « 2 », deux produits différents.
+     Éprouvé par _tests/test_listing_sous_emplacement.js (--degrade). */
+  let mapping = {}, mappingFile=null, mappingListing=null;
+  // _date_edition() — delai_mode_c.py:194-201 : « édité le JJ/MM/AAAA » cherché dans les SIX
+  // DERNIÈRES lignes, la première trouvée fait foi ; une date impossible vaut « pas de date »
+  // (datetime.date lève ValueError, Python rend None).
+  function dateEditionListing(rows){
+    for(const r of rows.slice(-6)){
+      const t = sa((r||[]).filter(c=>c!==null && c!==undefined && c!=="" && c!==0 && c!==false)
+        .map(c=>U.S(c)).join(" | "));
+      const m = /EDITE LE\s*(\d{2})\/(\d{2})\/(\d{4})/.exec(t);
+      if(!m) continue;
+      const d = {y:+m[3], m:+m[2], d:+m[1]};
+      return (d.y>=1 && d.m>=1 && d.m<=12 && d.d>=1 && d.d<=dernierJourDuMois(d.y, d.m)) ? d : null;
     }
-    const plat = platCells.join(" | ");
-    if(plat.indexOf("LISTING DES PRODUITS")<0 || plat.indexOf("FOURNISSEUR")<0) return null;
+    return null;
+  }
+  // _lire_listing() — delai_mode_c.py:203-237, porté LITTÉRALEMENT, pour les deux écrans. Rend null
+  // quand ce n'est pas un listing, ou qu'aucun code n'y est rangé (`return (mp or None), …`).
+  function lireListing(o){
+    const rows = o.rows||[];
+    const plein = c=>c!==null && c!==undefined && c!=="";
+    // `" | ".join(sa(c) for r in rows[:8] for c in r if c)` — `if c` écarte aussi le 0.
+    const tete = [];
+    for(let i=0;i<Math.min(8,rows.length);i++)
+      for(const c of (rows[i]||[])) if(plein(c) && c!==0 && c!==false) tete.push(c);
+    const plat = tete.map(c=>sa(c)).join(" | ");
+    if(plat.indexOf("LISTING DES PRODUITS")<0) return null;
+    const ecran = plat.indexOf("SOUS-EMPLACEMENT")>=0 ? "sous_emplacement"
+      : (plat.indexOf("FOURNISSEUR")>=0 ? "fournisseur" : null);
+    if(!ecran) return null;
+    // Le titre tel que Médiciel l'écrit, pour le journal : la première cellule qui le porte.
+    const cTitre = tete.find(c=>sa(c).indexOf("LISTING DES PRODUITS")>=0);
+    const titre = cTitre===undefined ? "" : U.strip(U.S(cTitre)).replace(/\s+/g, " ").slice(0, 120);
     let cur = null;
-    const mp = {};
-    for(const r of o.rows){
-      const cells = (r||[]).filter(c=>c!==null && c!==undefined && c!=="").map(c=>U.S(c));
-      // Une ligne de deux cellules utiles ou moins portant « FOURNISSEUR : X » ouvre une section.
-      if(cells.length <= 2){
+    const mp = {}, lignes = {};
+    for(const r0 of rows){
+      const r = r0||[];
+      const cells = r.filter(plein).map(c=>U.S(c));          // [str(c) for c in r if c not in (None, "")]
+      if(!cells.length) continue;
+      const a = r[0];
+      const c0 = sa((plein(a) && a!==0 && a!==false) ? U.S(a) : "");   // sa(str(r[0] or ""))
+      if(ecran==="sous_emplacement" && c0.indexOf("SOUS-EMPLACEMENT")===0){
+        const t = U.S(a), k = t.indexOf(":");
+        cur = U.strip(k>=0 ? t.slice(k+1) : t);              // str(r[0]).split(":", 1)[-1].strip()
+        continue;
+      }
+      if(ecran==="fournisseur" && cells.length<=2){
         const m = /FOURNISSEUR\s*:\s*(.+)/.exec(sa(cells.join(" ")));
         if(m){ cur = U.strip(m[1]); continue; }
       }
-      if(r[0]===null || r[0]===undefined || cur===null) continue;
-      const code = U.C(r[0]);
-      if(!code) continue;
-      const cu = sa(code);
-      if(cu.indexOf("CODE PRODUIT")===0 || cu.indexOf("TOTAUX")===0 || cu.indexOf("EDITE")===0) continue;
+      // Lignes de comptage (« 3 », « 1832 », « 7007 ») et pieds de page : moins de trois cellules.
+      if(cur===null || !plein(a) || cells.length<3) continue;
+      const code = U.C(a);
+      if(!code || ["CODE","TOTAUX","EDITE","LISTING"].some(p=>c0.indexOf(p)===0)) continue;
+      (lignes[code] = lignes[code] || []).push({se:cur, lib:plein(r[1]) ? U.strip(U.S(r[1])) : ""});
       mp[code] = cur;
     }
-    return Object.keys(mp).length ? mp : null;
+    if(!Object.keys(mp).length) return null;
+    const doublons = Object.keys(lignes)
+      .filter(c=>lignes[c].some(x=>x.se!==lignes[c][0].se))
+      .map(c=>({code:c, lignes:lignes[c]}));
+    return {o:o, mp:mp, ecran:ecran, titre:titre, date:dateEditionListing(rows), doublons:doublons};
   }
+  const listings = [];
   for(const o of ouverts){
     if(o===stockFile || o===tcdFile) continue;
-    const mp = lireListingFournisseur(o);
-    if(mp){ mapping = mp; mappingFile = o; break; }
+    const l = lireListing(o);
+    if(l) listings.push(l);
+  }
+  // lire_mapping() v4.6 — delai_mode_c.py:268-272 : `cands.sort(key=lambda t: (t[0], t[1]),
+  // reverse=True)`, t[0] = la date « édité le » (date.min sans elle), t[1] = le nom du fichier en
+  // minuscules. Les deux tris sont STABLES : à clé égale, l'ordre de dépôt (chez Python, celui des
+  // chemins) départage.
+  const cleDateL = l=>l.date ? l.date.y*10000 + l.date.m*100 + l.date.d : -1;
+  const cleNomL = l=>String(l.o.nom||"").split(/[\\\/]/).pop().toLowerCase();
+  listings.sort(function(a, b){
+    if(cleDateL(a) !== cleDateL(b)) return cleDateL(b) - cleDateL(a);
+    const na = cleNomL(a), nb = cleNomL(b);
+    return na < nb ? 1 : (na > nb ? -1 : 0);
+  });
+  const editeLe = l=>l.date ? "édité le "+dateFRB1(l.date) : "sans date « édité le » lisible";
+  if(listings.length){
+    const l = mappingListing = listings[0];
+    mapping = l.mp; mappingFile = l.o;
+    log("ok", l.o.nom+" — table de correspondance code -> sous-emplacement reconnue : listing « "+
+      l.titre+" », lu par "+(l.ecran==="sous_emplacement"
+        ? "ses sections « SOUS-EMPLACEMENT : » (colonne A)"
+        : "ses blocs « FOURNISSEUR : », qui portent en réalité le sous-emplacement")+", "+
+      editeLe(l)+", "+Object.keys(l.mp).length+" code(s) rangé(s).");
+    if(listings.length>1)
+      log("info", (listings.length-1)+" autre(s) listing(s) des produits déposé(s), écarté(s) : "+
+        listings.slice(1).map(x=>"« "+x.o.nom+" » ("+editeLe(x)+")").join(", ")+". Comme chez "+
+        "Python, le plus récent « édité le » l'emporte, puis, à date égale, le nom de fichier qui "+
+        "se classe le dernier — l'ordre de dépôt n'y est pour rien.");
   }
   // ---- Repli v5 : export complet du stock portant CODE 1 + SOUS-EMPLACEMENT ----
   if(!mappingFile) for(const o of ouverts){
@@ -7297,13 +7985,16 @@ function calculerModeC(ouverts, cfg, log, journal){
     mappingFile = o; break;
   }
   if(!mappingFile){
-    log("warn","Mode C : aucune table de correspondance code -> sous-emplacement trouvée, "+
-      "ni dans la variante « LISTING DES PRODUITS...FOURNISSEUR », ni dans le repli "+
-      "CODE 1 + SOUS-EMPLACEMENT : la ventilation officine/para sera indisponible.");
-  } else {
+    log("warn","Mode C : aucune table de correspondance code -> sous-emplacement trouvée — ni listing "+
+      "des produits Médiciel (l'état n°22 « LISTING DES PRODUITS PAR EMPLACEMENT/SOUS-EMPLACEMENT », "+
+      "ou l'ancien « LISTING DES PRODUITS » à blocs « FOURNISSEUR : »), ni repli CODE 1 + "+
+      "SOUS-EMPLACEMENT : la ventilation officine/para sera indisponible.");
+  } else if(!mappingListing){
     log("ok", mappingFile.nom+" — table de correspondance code -> sous-emplacement reconnue.");
   }
   for(const p of stock) p.se = mapping[p.code];
+  // Un code rangé sous plusieurs sous-emplacements est nommé au journal APRÈS le calcul, qui seul
+  // dit ce qui en dépend — « UN CODE SOUS PLUSIEURS SOUS-EMPLACEMENTS », après stock_mort_3m.
 
   // ---- Appariement stock <-> TCD, dormants vs actifs (rapport Mode C §3-4, égalité stricte) ----
   const actifs=[], dormants=[];
@@ -7349,14 +8040,15 @@ function calculerModeC(ouverts, cfg, log, journal){
   const couverture = svActifs ? U.pyRound(100*mappeVal/svActifs,1) : 0.0;
   const SEUIL_COUVERTURE = 95.0;
   let ventilation=null, ventilationIndicative=null, avertissement=null;
-  // Seuils Para = seuils Officine (verdict_delai unique appliqué à dG/dO/dP), PAS 45/75 du
-  // SKILL.md — comportement du fichier client validé (44,5j = "orange"), reproduit tel quel.
-  // Verdicts calculés via verdictDelaiC() sur dO/dP BRUTS (pas doVal/dpVal arrondis) — cf
-  // relecture adversariale haute #1/#2/#5.
+  // Officine : verdictDelaiC() sur dO BRUT (pas doVal arrondi), comme Python — cf relecture
+  // adversariale haute #1/#2/#5.
+  // Para : 6e passe (03/10/2026) — le BARÈME DE LA PARA, sur la valeur publiée dpVal (verdictParaC,
+  // « LE BARÈME DE LA PARA »), ventilation_indicative comprise. ÉCART VOULU AU PYTHON : verdict_delai()
+  // y applique les seuils de l'officine (« Para 44,5 j = orange »), et ce port avec lui jusqu'ici.
   if(couverture!==null && couverture>=SEUIL_COUVERTURE){
-    ventilation = { officine:{valeur:doVal, verdict:verdictDelaiC(dO)}, para:{valeur:dpVal, verdict:verdictDelaiC(dP)} };
+    ventilation = { officine:{valeur:doVal, verdict:verdictDelaiC(dO)}, para:{valeur:dpVal, verdict:verdictParaC(dpVal)} };
   } else {
-    ventilationIndicative = { officine:{valeur:doVal, verdict:verdictDelaiC(dO)}, para:{valeur:dpVal, verdict:verdictDelaiC(dP)},
+    ventilationIndicative = { officine:{valeur:doVal, verdict:verdictDelaiC(dO)}, para:{valeur:dpVal, verdict:verdictParaC(dpVal)},
       couverture_pct: couverture, statut: "indicative" };
     avertissement = "Couverture de la table de correspondance code -> sous-emplacement insuffisante ("+
       (couverture===null?"table absente":couverture+" %")+", seuil "+SEUIL_COUVERTURE+" %) : la "+
@@ -7454,6 +8146,105 @@ function calculerModeC(ouverts, cfg, log, journal){
     log("ok", f2c.nom+" — listing des non-vendus (3 mois glissants) reconnu pour stock_mort_3m.");
   }
 
+  /* ---- UN CODE SOUS PLUSIEURS SOUS-EMPLACEMENTS — 5e passe (03/10/2026), cf « L'ÉTAT N°22 … » ----
+     Où il est rangé se lit dans la table elle-même (mapping[code]), pas dans une règle supposée ;
+     ce qui en dépend se lit dans le calcul — d'où la place de ce message, APRÈS lui.
+     SECONDE VERSION (relecture du 03/10/2026). La première, émise avant le partage entre actifs et
+     dormants, disait « la ventilation officine/para en dépend » dès que les pôles différaient. Faux
+     pour un code sans stock (le message disait aussi « le calcul n'en dépend pas ») ; faux pour un
+     produit dormant ou sans vente en M-1 et M, que la ventilation ne compte pas — c'est alors le
+     « Stock mort officine (FCFA) » ou la base de l'officine qui bouge, et le message le taisait.
+     Ce que chaque calcul lit du sous-emplacement d'un produit EN STOCK :
+       - ACTIF (ventes de l'année non nulles au TCD, vente moyenne de M-1 et M positive) : sa ligne
+         du délai par rayon, et le délai de son pôle — officine, para, ou ni l'un ni l'autre pour les
+         laits et farines (le global seul) ;
+       - DORMANT (ventes de l'année nulles au TCD) : sa ligne du stock mort par rayon, et le « Stock
+         mort officine (FCFA) » s'il est rangé à l'officine ;
+       - NI L'UN NI L'AUTRE (des ventes dans l'année, aucune vente nette sur M-1 et M) : ni délai ni
+         stock dormant ;
+       - TOUS : la valeur de stock de leur rayon et de leur pôle — celle de l'officine est la base de
+         ses taux de stock mort (stock_mort_3m.par_pole.OFFICINE, classeur) — et, s'ils figurent au
+         listing des non-vendus, le stock mort 3 mois de leur pôle.
+     Un code SANS stock : aucun chiffre ne lit son sous-emplacement (seuls les produits en stock
+     reçoivent p.se). Actif ou dormant, c'est le LIBELLÉ qui en décide (le TCD se lit par libellé
+     normalisé) : deux produits en stock de même libellé ont le même sort. Plusieurs produits en
+     stock sous un même code : chacun est décrit. */
+  if(mappingListing && mappingListing.doublons.length){
+    // Le pôle comme la ventilation le lit (officine, para, ou laits et farines, dans aucun des deux
+    // délais) ; le stock mort, lui, ne sépare que l'officine (estPara faux) de tout le reste.
+    const poleSE = se=>estPara(se) ? (estLait(se) ? "para, laits et farines" : "para") : "officine";
+    const DELAI_POLE = {"officine":"le délai de l'officine", "para":"le délai de la para"};
+    const auStock = dateFRB1(periodeC);
+    const moisM1 = MOIS_AFFICHAGE[pmMo-1]+(pmY!==y ? " "+pmY : "");
+    const ouMois = moisM1+" ou "+MOIS_AFFICHAGE[mo-1]+" "+y, etMois = moisM1+" et "+MOIS_AFFICHAGE[mo-1]+" "+y;
+    const codesNV = f2c ? parseNonVendus3m(f2c.rows) : null;   // le filtre même de stock_mort_3m
+    const et = l=>l.length>1 ? l.slice(0, -1).join(", ")+" et "+l[l.length-1] : l[0];
+    const D = mappingListing.doublons;
+    D.slice(0, 5).forEach(function(d){
+      const garde = mapping[d.code];
+      const ses = [], poles = [];
+      d.lignes.forEach(x=>{ if(ses.indexOf(x.se)<0) ses.push(x.se); });
+      ses.forEach(se=>{ const k = poleSE(se); if(poles.indexOf(k)<0) poles.push(k); });
+      const prods = stock.filter(q=>q.code===d.code);
+      let suite;
+      if(!prods.length) suite = " Ce code n'a pas de stock au "+auStock+" : aucun chiffre de ce module n'en dépend.";
+      else {
+        let unActif = false, unDormant = false;
+        const decrits = prods.map(function(p){
+          const sous = d.lignes.filter(x=>x.lib && normJoin(x.lib)===p.lab).map(x=>x.se);
+          const autreLigne = (sous.length && sous.indexOf(garde)<0) ? sous[0] : null;
+          let sort;
+          if(actifs.some(a=>a.lab===p.lab)){
+            unActif = true;
+            sort = "Vendu en "+ouMois+", il entre dans le délai d'écoulement : sur la ligne « "+garde+
+              " » du délai par rayon, et "+(DELAI_POLE[poleSE(garde)] ? "dans "+DELAI_POLE[poleSE(garde)]
+                : "dans le seul délai global — les laits et farines ne comptent ni à l'officine ni en para")+".";
+          } else if(dormants.indexOf(p)>=0){
+            unDormant = true;
+            sort = "Ses ventes de "+y+" au TCD sont nulles : il compte comme dormant, sur la ligne « "+
+              garde+" » du stock mort par rayon, et "+(estPara(garde) ? "hors du" : "dans le")+
+              " « Stock mort officine (FCFA) ».";
+          } else
+            sort = "Ses ventes de "+y+" au TCD ne sont pas nulles, mais il n'a aucune vente nette sur "+
+              etMois+" : il n'entre ni dans le délai d'écoulement ni dans le stock dormant.";
+          const qui = "« "+p.lib+" » ("+String(p.stock).replace(".", ",")+" en stock, "+NF(p.val)+" F)";
+          return prods.length===1
+            ? qui+" : il compte donc sous « "+garde+" »"+(autreLigne ? ", alors que ce libellé est celui "+
+                "de la ligne rangée sous « "+autreLigne+" »" : "")+". "+sort
+            : qui+(autreLigne ? ", dont le libellé est celui de la ligne rangée sous « "+autreLigne+" »" : "")+
+                ". "+sort;
+        });
+        suite = " Au stock du "+auStock+", ce code "+(prods.length===1 ? "est "
+          : "porte "+prods.length+" produits, tous comptés sous « "+garde+" » : ")+decrits.join(" ");
+        const offDiff = ses.some(se=>estPara(se)!==estPara(ses[0]));
+        if(poles.length===1)
+          suite += " Ces sous-emplacements sont du même pôle ("+poles[0]+") : ni la ventilation "+
+            "officine/para ni les chiffres de stock mort par pôle n'en dépendent.";
+        else {
+          const dep = [];
+          if(unActif) poles.forEach(k=>{ if(DELAI_POLE[k]) dep.push(DELAI_POLE[k]); });
+          if(offDiff && unDormant) dep.push("le « Stock mort officine (FCFA) »");
+          if(offDiff && codesNV && codesNV.has(d.code)) dep.push("le stock mort 3 mois de l'officine");
+          if(offDiff) dep.push("la valeur du stock de l'officine (la base de ses taux de stock mort)");
+          suite += " Ces sous-emplacements ne sont pas du même pôle ("+poles.join(", ")+")"+(dep.length
+            ? " : "+et(dep)+(dep.length>1 ? " en dépendent" : " en dépend")+(unActif ? "" : ", pas la "+
+                "ventilation officine/para, qui ne compte que les produits vendus en "+ouMois)+"."
+            : ", mais ils ne se distinguent que dans le délai de la para, où "+(prods.length>1
+                ? "aucun de ces produits n'entre" : "ce produit n'entre pas")+" : aucun chiffre par pôle "+
+              "n'en dépend.");
+        }
+      }
+      log("warn","Le code « "+d.code+" » figure sous "+(ses.length===2 ? "deux" : ses.length)+
+        " sous-emplacements dans « "+mappingFile.nom+" » : "+d.lignes.map(x=>"« "+x.se+" »"+
+        (x.lib ? " (ligne « "+x.lib+" »)" : "")).join(", puis ")+". Comme chez Python, la dernière "+
+        "ligne lue l'emporte : il est rangé sous « "+garde+" »."+suite+" À vérifier dans Médiciel.");
+    });
+    if(D.length>5)
+      log("warn",(D.length-5)+" autre(s) code(s) figure(nt) aussi sous plusieurs sous-emplacements dans « "+
+        mappingFile.nom+" », chacun rangé sous la dernière ligne lue : "+D.slice(5, 25).map(d=>"« "+
+        d.code+" » sous « "+mapping[d.code]+" »").join(", ")+(D.length>25 ? "…" : "")+".");
+  }
+
   /* ---- points forts / faibles et actions — delai_mode_c.py:488-501, PORTÉS LITTÉRALEMENT ----
      CORRIGÉ LE 17/09/2026. Le module écrivait ici les textes du MODE A : « Délai d'écoulement
      global dans la cible (19-30 jours). » et une phrase « Rayons en sur-stock : … » que le
@@ -7511,7 +8302,11 @@ function calculerModeC(ouverts, cfg, log, journal){
     stock_mort_3m: stockMort3m,
     sources: { stock: stockFile.nom, ventes: tcdFile.nom,
                mapping_pole: mappingFile?mappingFile.nom:"non trouvé",
-               mapping_date: null }, // non détectée automatiquement dans ce port (cf bandeau)
+               // 5e passe (03/10/2026) : la date « édité le » du listing retenu, écrite comme
+               // lire_mapping() de Python (« JJ/MM/AAAA », ou « date d'édition absente ») ; null
+               // pour le repli CODE 1 + SOUS-EMPLACEMENT, que ce chantier ne touche pas.
+               mapping_date: mappingListing ? (mappingListing.date ? dateFRB1(mappingListing.date)
+                 : "date d'édition absente") : null },
     calcul: { vm:"moyenne des quantités vendues sur M-1 et M (TCD des ventes)",
               formule:"somme(stock x PRMP) / somme(VM x PRMP / 30)",
               nb_ref_actives: actifs.length, nb_ref_stock: stock.length,
@@ -7522,7 +8317,12 @@ function calculerModeC(ouverts, cfg, log, journal){
     // une charge de livrable, filtrée à l'export comme les autres clés techniques.
     avertissement: avertissement,
     points_forts: pointsForts,
-    points_faibles: pointsFaibles.length?pointsFaibles:["Aucun rayon en sur-stock détecté (>45 jours)."],
+    // 6e passe (03/10/2026) — PLUS DE REPLI « Aucun rayon en sur-stock détecté (>45 jours). » : il
+    // s'écrivait sans qu'aucun rayon ait été examiné (le Mode C ne juge pas ses rayons), et mettait le
+    // sur-stock de la para à 45 j quand son barème le met au-delà de 75 j. Python n'écrit rien (liste
+    // vide), le Mode A non plus depuis l'Étape 3 : même chose ici. Aucun mois réel publié en Mode C ne
+    // l'affichait : juillet, août et septembre 2026 ont un stock mort de plus de 10 %, toujours écrit.
+    points_faibles: pointsFaibles,
     actions_recommandees: actionsC,
     // TEXTE DE RÉSERVE — delai_mode_c.py:483-486, repris MOT POUR MOT (corrigé le 17/09/2026).
     // L'application en avait une reformulation plus détaillée ; elle disait la même chose, mais
@@ -7690,9 +8490,13 @@ async function calculer(fichiers, config, equivalences){
   // l'Étape 3 : sans lui, un état de stock sans mention « VALEUR DU STOCK AU » (cas RÉEL du
   // fichier de mai 2026) produisait periode_analysee:"" — chiffres pourtant justes, mais
   // matchPeriod() renvoyait false et le KPI DISPARAISSAIT silencieusement du tableau de bord.
-  // N'est utilisé QUE par le Mode A, où la période ne sert qu'à étiqueter : le Mode C s'en sert
-  // pour reconstruire la VM (colonnes M et M-1 du TCD), un repli y changerait le CALCUL — il
-  // continue donc d'échouer explicitement plutôt que de deviner (comportement inchangé).
+  // N'est utilisé comme REPLI que par le Mode A, où la période ne sert qu'à étiqueter : le Mode C
+  // s'en sert pour reconstruire la VM (colonnes M et M-1 du TCD), un repli y changerait le CALCUL
+  // — il continue donc d'échouer explicitement plutôt que de deviner. Depuis le 01/10/2026, le
+  // Mode C le lit pour VÉRIFIER : une photo de fin d'un autre mois que celui demandé est refusée.
+  // 4e passe (02/10/2026) : le Mode A ne s'en sert plus comme repli, mais pour VÉRIFIER lui aussi
+  // la date du B1 (lue dans la mention « VALEUR DU STOCK AU », sinon dans le nom de son onglet —
+  // 5e passe, 03/10/2026 —, sinon dans le nom du fichier).
   cfg._periodeInterface = (config && typeof config.periode==="string" && /^\d{4}-\d{2}$/.test(config.periode))
     ? config.periode : null;
   // Historique de l'officine (19/08/2026) : équivalent maison de kpi_history.previous() du
@@ -7713,7 +8517,9 @@ async function calculer(fichiers, config, equivalences){
     for(const f of candidats){
       try{
         const cl = await L.lireClasseur(f.buffer);
-        ouverts.push({nom:f.nom, rows:cl.rows});
+        // 5e passe (03/10/2026) : le nom de l'onglet lu (cl.feuilleActive, rendu par le lecteur
+        // commun) voyage avec ses lignes — Médiciel y écrit la date de l'historique du stock.
+        ouverts.push({nom:f.nom, rows:cl.rows, onglet:cl.feuilleActive});
       }catch(e){
         log("warn", f.nom+" — illisible, ignoré pour le délai d'écoulement ("+L.messagePourJournal(e,80)+").");
       }
@@ -7725,19 +8531,52 @@ async function calculer(fichiers, config, equivalences){
 
     // ---- Mode A : Fichier 1 reconnu par son en-tête ligne 1 (VM + STOCK TOTAL + PRMP) ----
     // run_delai.py:34-45 (rapport Mode A §1, cité littéralement).
-    let f1 = null;
+    // 4e passe (02/10/2026) : TOUS les candidats sont examinés, et seul un B1 daté du dernier jour
+    // du mois demandé est retenu (« LE B1 : LA PHOTO DE LA FIN DU MOIS DEMANDÉ ») ; le premier
+    // trouvé ne gagne plus d'office. Les autres sont NOMMÉS au journal, avec leur motif, et retirés
+    // du lot : ils n'entrent dans aucun calcul, Mode C compris.
+    let f1 = null, photoA = null;
+    const b1Ecartes = [], refuses = new Set();
     for(const o of ouverts){
       const header = (o.rows[0]||[]).map(c=>U.strip(U.S(c)).toUpperCase());
       const hasVM = header.indexOf("VM")>=0;                 // égalité stricte de cellule
       const hasStockTotal = header.some(c=>c.indexOf("STOCK TOTAL")>=0);
       const hasPRMP = header.some(c=>c.indexOf("PRMP")>=0);
-      if(hasVM && hasStockTotal && hasPRMP){ f1=o; break; }
+      if(!(hasVM && hasStockTotal && hasPRMP)) continue;
+      const ph = examinerPhotoB1(o.nom, o.rows, cfg._periodeInterface, "ecran", o.onglet);
+      if(!ph.ok){ b1Ecartes.push(ph); refuses.add(o); continue; }
+      if(!f1){ f1 = o; photoA = ph; }
+      else log("info", o.nom+" — autre historique stock de la même fin de mois ("+dateFRB1(ph.date)+
+        ") : seul le premier déposé, « "+f1.nom+" », est lu.");
     }
-    if(f1) return calculerModeA(f1, ouverts, cfg, log, journal);
+    for(const ph of b1Ecartes)
+      log("warn", "Historique stock ÉCARTÉ — "+ph.motif+" Il n'entre dans aucun calcul du délai "+
+        "d'écoulement.");
+    const restants = ouverts.filter(o=>!refuses.has(o));
+    if(f1) return calculerModeA(f1, restants, cfg, log, journal, photoA);
 
-    log("info","Aucun état de stock avec colonne VM trouvé : recherche du Mode C (VM reconstruite "+
+    log("info",(b1Ecartes.length ? "Aucun historique stock retenu (voir ci-dessus)" :
+      "Aucun état de stock avec colonne VM trouvé")+" : recherche du Mode C (VM reconstruite "+
       "depuis un TCD des ventes).");
-    const resC = calculerModeC(ouverts, cfg, log, journal);
+    const resC = calculerModeC(restants, cfg, log, journal);
+    if(b1Ecartes.length){
+      if(resC && !resC.erreur){
+        // Phrase neutre : ce bloc est recopié dans la Parapharmacie, où le délai para qui suit
+        // peut rester NON CALCULÉ — elle dit d'où vient le calcul, pas ce qui est publié.
+        log("warn","Le calcul ci-dessus est celui du Mode C — sur l'état n°20, dont la photo est "+
+          "contrôlée — : l'historique stock écarté n'y entre pas.");
+        return resC;
+      }
+      const vise = b1Ecartes.map(p=>p.vise).filter(Boolean)[0] || null;
+      const conseil = consigneB1(vise);
+      // 5e passe (03/10/2026) : « S'il a été manqué » laissait croire qu'un B1 ne se ressort pas.
+      log("err","DÉLAI D'ÉCOULEMENT NON CALCULÉ — aucun historique stock déposé n'est la photo de la "+
+        "fin du mois demandé (voir ci-dessus), et le Mode C n'a pas pris le relais. "+conseil+
+        " À défaut, déposez l'état n°20 « VALEUR DU STOCK A UNE DATE » "+(vise ? "au "+
+        dateFRB1({y:vise.y, m:vise.m, d:dernierJourDuMois(vise.y, vise.m)}) : "du dernier jour du mois")+
+        " et le TCD des ventes : le délai se calcule alors en Mode C. Rien n'est publié.");
+      return {erreur:true, journal:journal};
+    }
     if(resC) return resC;
 
     log("err","Analyse impossible : ni un état de stock avec VM (Mode A) ni un couple état de "+
@@ -7750,6 +8589,19 @@ async function calculer(fichiers, config, equivalences){
     return {erreur:true, journal:journal};
   }
 }
+
+// 4e passe (02/10/2026) : le contrôle de la date du B1, pour le module « marge » de la
+// Parapharmacie, qui lit le même fichier — une seule règle, écrite une fois (bloc recopié dans la
+// Parapharmacie par construire-parapharmacie.py).
+// 5e passe (03/10/2026) : et la date lue dans le nom de l'onglet (dateOnglet), avec l'onglet que
+// Médiciel écrit pour une fin de mois (ongletConseille).
+glob.KemetPhotoStock = { examiner:examinerPhotoB1, juger:jugerPhotoFinDeMois, datesDuNom:datesDuNom,
+                         nomConseille:nomConseilleB1, consigne:consigneB1, deMois:deMoisB1, dateFR:dateFRB1,
+                         dateOnglet:dateDeLOnglet, ongletConseille:ongletConseilleB1 };
+// 6e passe (03/10/2026) : le barème de la para (« LE BARÈME DE LA PARA »), pour l'écran par
+// indicateur et la note du délai de l'Achat, et la carte de la Parapharmacie — une seule règle,
+// écrite une fois.
+glob.KemetBaremePara = { verdict:verdictParaC, vert:"<45", orange:"45 à 75", rouge:">75" };
 
 glob.KemetModules.enregistrer({
   kpi_id:"delai_ecoulement",
@@ -7776,6 +8628,19 @@ const RECID_DEPTH = 4; // --recid-depth, défaut du script
 // perim_lib.MONTHS — dict Python cité, ordre d'insertion préservé (clés accentuées comprises).
 const MONTHS_ALL = {"JANVIER":1,"FEVRIER":2,"FÉVRIER":2,"MARS":3,"AVRIL":4,"MAI":5,"JUIN":6,
   "JUILLET":7,"AOUT":8,"AOÛT":8,"SEPTEMBRE":9,"OCTOBRE":10,"NOVEMBRE":11,"DECEMBRE":12,"DÉCEMBRE":12};
+// LES ABRÉVIATIONS DE L'OFFICINE (01/10/2026). DÉFAUT D'ORIGINE : perim_lib.MONTHS ne connaît
+// que les noms entiers, alors que l'officine écrit « PERIMES SEPT 26 » (correction n°1485, réelle).
+// Le mois cité n'étant pas reconnu, il retombait sur la DATE DE SAISIE : des périmés de septembre
+// saisis en octobre (l'usage : juillet saisi le 12/08, août le 16/09) auraient été rangés en
+// octobre, et leur taux rapporté au CA d'octobre. Les noms des fichiers CA acceptaient déjà ces
+// jetons (CA_MONTH_TOKENS) : seul le commentaire les ignorait. Consultées APRÈS les noms entiers,
+// avec bornes de mot : « SEPTEMBRE » reste lu comme avant, « SEPT » ne se lit pas dans
+// « SEPTEMBRE ». Aucun commentaire réel de mai à août n'en contient : leur rejeu ne bouge pas.
+const MONTHS_ABREV = {"JANV":1,"FEV":2,"FÉV":2,"FEVR":2,"FÉVR":2,"AVR":4,"JUIL":7,"SEPT":9,
+  "OCT":10,"NOV":11,"DEC":12,"DÉC":12};
+function moisDuLibelle(k){
+  return MONTHS_ALL[k]!==undefined ? MONTHS_ALL[k] : MONTHS_ABREV[k];
+}
 // perim_lib.MOIS_FR — libellés EXACTS du script (accents et capitale).
 const MOIS_LABEL = {1:"Janvier",2:"Février",3:"Mars",4:"Avril",5:"Mai",6:"Juin",7:"Juillet",
   8:"Août",9:"Septembre",10:"Octobre",11:"Novembre",12:"Décembre"};
@@ -7986,6 +8851,10 @@ function moisCite(commentaire){
   for(const nom in MONTHS_ALL){
     if(new RegExp("\\b"+nom+"\\b").test(commentaire)) return MONTHS_ALL[nom];
   }
+  // Puis les abréviations (01/10/2026, cf MONTHS_ABREV).
+  for(const nom in MONTHS_ABREV){
+    if(new RegExp("\\b"+nom+"\\b").test(commentaire)) return MONTHS_ABREV[nom];
+  }
   return null;
 }
 // _match_month — port complet (autorité du commentaire, année 4 chiffres sinon 2 chiffres
@@ -8084,7 +8953,9 @@ function parsePerimes(cl){
     if(a && typeof a==="string"){
       const k = U.strip(a).toUpperCase();
       // séparateur de mois : 1re cellule = nom de mois ET 2e cellule vide
-      if(MONTHS_ALL[k]!==undefined && (b===null||b===undefined||U.strip(U.S(b))==="")){ cur=k; continue; }
+      // Séparateur de mois : nom entier OU abréviation (01/10/2026) — une ligne « SEPT » laissait
+      // les lignes de septembre rangées sous le mois précédent.
+      if(moisDuLibelle(k)!==undefined && (b===null||b===undefined||U.strip(U.S(b))==="")){ cur=k; continue; }
     }
     if(!a || !b) continue; // falsy, comme Python
     const da = toDateC(b, cl.date1904);
@@ -8102,7 +8973,7 @@ function parsePerimes(cl){
       dur = (da&&dp) ? joursEntre(da,dp) : null;
     }
     const imp = (r.length>9 && r[9]!==null && r[9]!==undefined && r[9]!=="") ? U.strip(U.S(r[9])).toUpperCase() : "";
-    out.push({mois:cur, moisNum:(cur!==null?MONTHS_ALL[cur]:null),
+    out.push({mois:cur, moisNum:(cur!==null?moisDuLibelle(cur):null),
       designation:U.strip(U.S(a)),
       grossiste:(r.length>3 && r[3]) ? U.strip(U.S(r[3])).toUpperCase() : "INCONNU",
       quant:q, prix_achat:pa, total:tot,
@@ -8552,19 +9423,48 @@ async function calculer(fichiers, config, equivalences){
       "), "+lignes.length+" ligne(s), HT "+U.fmtFCFA(metaCorr.ht)+" — période analysée : "+moisLabel+" "+YEAR+".");
 
     /* ---- 3. État de stock détaillé (détection par contenu ; optionnel comme dans le script) ---- */
-    let fEtat=null;
+    /* 4e passe (02/10/2026) — LE B1 : LA PHOTO DE LA FIN DU MOIS ANALYSÉ, ICI AUSSI. L'état de stock
+       détaillé que reconnaît ce module (SOUS-EMPLACEMENT et CODE 1 en ligne 1) est l'historique
+       stock complet, le « B1 » du délai d'écoulement, qui ne porte aucune date dans ses cellules.
+       Le premier déposé était pris, de n'importe quel jour : septembre déposé avec le B1 de juin
+       publiait « Part périmés évitables (plancher) = 20,5 % » sur les ventes (VM) de juin, et la
+       Parapharmacie « Ratio périmés/CA para = 0 » en rangeant les périmés de septembre par la table
+       de juin — deux chiffres qui, sans ce B1, n'existent pas. Il est désormais jugé par la règle
+       du délai d'écoulement (KemetPhotoStock : date lue dans « VALEUR DU STOCK AU », sinon dans
+       le nom de son onglet — 5e passe, 03/10/2026 —, sinon dans son nom ; le dernier jour du mois
+       analysé) — une seule réponse pour les trois modules qui le lisent, et pour la table des
+       sous-emplacements comme pour les ventes. Écarté, il est nommé
+       et ne sert À RIEN ici : ni à ranger les périmés par rayon et par pôle, ni aux ventes du
+       critère FEFO (section 13). Le mois attendu est celui des corrections lues (MM, YEAR). */
+    const PB1 = glob.KemetPhotoStock;
+    const periodeB1 = YEAR+"-"+String(MM).padStart(2,"0");
+    // 5e passe (03/10/2026) : avec le nom de l'onglet lu, où Médiciel écrit la date du stock.
+    const jugerB1 = o => PB1 ? PB1.examiner(o.nom, o.rows, periodeB1, "analyse", o.cl && o.cl.feuilleActive)
+      : {ok:false, motif:"L'historique stock « "+o.nom+" » n'a pas pu être daté : le contrôle de sa "+
+          "date (bloc « module-delai_ecoulement ») manque dans cette application — anomalie de "+
+          "construction."};
+    let fEtat=null, avertB1=null;
+    const b1Ecartes = [], b1Refuses = new Set();
     for(const o of ouverts){
-      if(o===fCorr) continue;
-      if(estEtatStockDetaille(o.rows)){ fEtat=o; break; } // ordre de dépôt (mtime indisponible)
+      if(o===fCorr || !estEtatStockDetaille(o.rows)) continue;
+      const ph = jugerB1(o);
+      if(!ph.ok){ b1Ecartes.push(ph.motif); b1Refuses.add(o); continue; }
+      if(!fEtat){ fEtat=o; avertB1=ph.avertissement||null; } // ordre de dépôt (mtime indisponible)
     }
+    for(const motif of b1Ecartes)
+      log("warn","Historique stock ÉCARTÉ — "+motif+" Il ne sert ni à ranger les périmés par rayon "+
+        "et par pôle, ni aux ventes du critère FEFO.");
     const esIdx = fEtat ? indexEtatStock(fEtat.rows) : {};
     if(!fEtat){
-      log("warn","État de stock détaillé *** ABSENT (emplacements non joints) *** : l'analyse continue "+
+      log("warn","État de stock détaillé *** "+(b1Ecartes.length ? "ÉCARTÉ (voir ci-dessus)" : "ABSENT")+
+        " (emplacements non joints) *** : l'analyse continue "+
         "(comportement du script), emplacement=NON RENSEIGNÉ et pôle=OFFICINE partout ; le critère C "+
         "(conseil/OTC, correctif DG) et la ventilation par rayon seront inopérants sur ce dépôt.");
     } else {
       log("ok", fEtat.nom+" — état de stock détaillé reconnu, "+Object.keys(esIdx).length+
         " code(s) indexé(s) (jointure directe code -> sous-emplacement/rayon, v3 sans table de mapping).");
+      // 5e passe (03/10/2026) : un nom de fichier qui porte une autre date que l'onglet est dit ici.
+      if(avertB1) log("warn", avertB1);
     }
 
     /* ---- 4. Suivi des périmés (qualitatif : grossiste, durée, imputation ; optionnel) ---- */
@@ -8578,8 +9478,9 @@ async function calculer(fichiers, config, equivalences){
       log("ok", pf.nom+" — fichier de suivi des périmés reconnu ("+perRows.length+" ligne(s), "+
         Object.keys(gbIdx).length+" désignation(s) pour "+moisLabel+"), jointure par désignation normalisée.");
     } else {
+      // 4e passe (02/10/2026) : « durée=None » — le None de Python — s'affichait au journal du dépôt.
       log("warn","Fichier de suivi des périmés *** ABSENT (qualitatif non joint) *** : grossiste=INCONNU, "+
-        "durée=None, imputation vide pour toutes les lignes (comportement du script) — les critères A "+
+        "durée non renseignée, imputation vide pour toutes les lignes (comportement du script) — les critères A "+
         "(ARRIVE DATE) et les durées en stock seront inopérants sur ce dépôt.");
     }
 
@@ -8690,6 +9591,21 @@ async function calculer(fichiers, config, equivalences){
     const valOff = val - valPara;
     const ratioPara = caPara ? valPara/caPara*100 : 0.0;  // défaut 0.0 du script (L103)
     const ratioOff = caOff ? valOff/caOff*100 : null;     // None si ca_off nul (L104)
+    /* 01/10/2026 (essai « mois neuf » sur septembre réel) : SANS état de stock détaillé, chaque
+       périmé est rangé « OFFICINE » (comportement du script) — la part para vaut alors 0 % par
+       construction, pas par mesure, et le pôle Parapharmacie la republiait « 0 %, vert ». Le pôle
+       des périmés est INCONNU : la ventilation officine/para n'est pas publiée. */
+    const ventilationInconnue = !fEtat;
+    // 4e passe (02/10/2026) : un historique stock déposé mais ÉCARTÉ (section 3) est dit tel quel,
+    // et la consigne est celle du délai d'écoulement, qui lit le même fichier : à quelle date le
+    // sortir de Médiciel (5e passe, 03/10/2026 : elle disait « quand le sortir, comment le nommer »).
+    // L'ancien « Déposer l'état de stock détaillé » ne disait ni l'un ni l'autre.
+    if(ventilationInconnue)
+      log("warn","Ventilation officine/para NON PUBLIÉE : "+(b1Ecartes.length
+        ? "l'historique stock déposé est écarté (voir ci-dessus), et "
+        : "sans état de stock détaillé, ")+"le pôle de chaque produit périmé est inconnu — ce n'est "+
+        "pas « 0 % en para ». "+(PB1 ? PB1.consigne({y:YEAR, m:MM}).replace(/^Pour servir, /, "Pour "+
+        "l'obtenir, ") : "Déposer l'état de stock détaillé (colonnes SOUS-EMPLACEMENT) pour l'obtenir."));
     const du = {ras_n:ras.length, ras_moy:(ras.length?moyenne(ras):0), ras_med:(ras.length?mediane(ras):0),
       ad_n:ad.length, ad_moy:(ad.length?moyenne(ad):0), pct_ad:(mai.length?nbAdTot/mai.length*100:0)};
 
@@ -8776,8 +9692,9 @@ async function calculer(fichiers, config, equivalences){
           ? "un seul fichier de suivi annuel des périmés exploitable (année "+anneesSuivi[0]+")"
           : "aucun fichier de suivi annuel des périmés exploitable")+
         ". Un récidiviste est un produit périmé sur AU MOINS 2 années différentes : sur une seule "+
-        "année, « récidivistes 2+ ans » et « chroniques (>=3 ans) » vaudront 0 — absence de données, "+
-        "pas absence de récidivistes. Déposer aussi les fichiers de suivi annuel des années "+
+        "année, « récidivistes 2+ ans » et « chroniques (>=3 ans) » ne sont pas mesurables — absence "+
+        "de données, pas absence de récidivistes : le pôle Achat écrit « Récidivistes non "+
+        "mesurables », jamais « 0 ». Déposer aussi les fichiers de suivi annuel des années "+
         "antérieures ("+listeAnnees(anneesManquantes)+", profondeur "+RECID_DEPTH+" ans du script) "+
         "pour obtenir le véritable historique.");
     } else if(anneesManquantes.length){
@@ -8818,11 +9735,19 @@ async function calculer(fichiers, config, equivalences){
     if(fEtat && ligne1AVM(fEtat.rows)) stockVm = fEtat;
     else {
       const kw=["stock","valeur","valoris","historique"];
-      const candStock = ouverts.filter(o=>o!==fCorr && kw.some(k=>String(o.nom||"").toLowerCase().indexOf(k)>=0));
+      // 4e passe (02/10/2026) : un historique stock écarté (section 3) ne revient pas par son nom.
+      const candStock = ouverts.filter(o=>o!==fCorr && !b1Refuses.has(o) && kw.some(k=>String(o.nom||"").toLowerCase().indexOf(k)>=0));
       candStock.sort((a,b)=>jourDansNom(b.nom)-jourDansNom(a.nom)); // jour du nom d'abord (find_stock_file), départage ordre de dépôt
       stockVm = candStock.length ? candStock[0] : null;
     }
-    const fVendu = ouverts.find(o=>o!==fCorr && String(o.nom||"").toLowerCase().indexOf("vendu")>=0) || null;
+    // 01/10/2026 (essai « mois neuf ») : « vendu » se lit aussi dans « NonVendu ». Sans état de
+    // stock à VM, le listing des produits NON vendus servait d'index des VENTES : chaque périmé
+    // passait « à rotation nulle », et l'évitabilité sortait 0 % vert. Il est exclu ici.
+    const fVendu = ouverts.find(o=>{
+      if(o===fCorr) return false;
+      const nl = U.normLibre(String(o.nom||"")).toLowerCase();
+      return nl.indexOf("vendu")>=0 && !/non[\s_-]*vendu/.test(nl);
+    }) || null;
     const fAbc = ouverts.find(o=>{
       if(o===fCorr) return false;
       const nl = String(o.nom||"").toLowerCase();
@@ -8833,6 +9758,15 @@ async function calculer(fichiers, config, equivalences){
       let idxVentes=null, srcVentes=null;
       if(stockVm){
         idxVentes = construireIndexVentesStock(stockVm.rows);
+        // 4e passe (02/10/2026) : un état du stock à VM pris par son NOM (repli ci-dessus) passe la
+        // même règle de date que le B1 — d'un autre jour, ses ventes ne sont pas celles du mois.
+        if(idxVentes && stockVm!==fEtat){
+          const ph = jugerB1(stockVm);
+          if(!ph.ok){
+            log("warn","État du stock à VM ÉCARTÉ pour le critère FEFO — "+ph.motif);
+            idxVentes = null;
+          } else if(ph.avertissement) log("warn", ph.avertissement); // 5e passe (03/10/2026)
+        }
         if(idxVentes) srcVentes = "VM état du stock : "+stockVm.nom;
       }
       if(!idxVentes && fVendu){
@@ -8889,7 +9823,7 @@ async function calculer(fichiers, config, equivalences){
     // (garde ratio!==null : le script planterait sur ratio None — ca_total nul —, cas rendu
     // impossible ici par l'échec explicite sans fichier CA ; garde ajoutée sans effet réel)
     if(ratio!==null && ratio<0.5) pf_.push("Ratio global "+fmtFixed(ratio,3)+"% sous le seuil vert (0,5%) — niveau maîtrisé");
-    if(ratioPara===0) pf_.push("Aucun périmé parapharmacie (ratio para 0%)");
+    if(ratioPara===0 && !ventilationInconnue) pf_.push("Aucun périmé parapharmacie (ratio para 0%)");
     const clean=[]; gro.forEach((v,g)=>{ if(v.nb_ad===0) clean.push(g); });
     if(clean.length) pf_.push("Grossistes sans ARRIVE DATE : "+clean.join(", "));
     if(n1 && n1.ca){
@@ -8907,8 +9841,21 @@ async function calculer(fichiers, config, equivalences){
     if(rouges.length) pfa.push("Rayons rouges (>1%) : "+rouges.slice(0,5).map(e=>e.empl+" "+fmtFixed(e.ratio,1)+"%"+
       (e.small_ca?" [CA faible]":"")).join(", "));
     const chron = recid.filter(r=>r.cat==="Chronique");
-    pfa.push(chron.length ? chron.length+" récidiviste(s) chronique(s) (≥3 ans)"
-      : recid.length+" récidivistes 2+ ans (aucun chronique)");
+    // 4e passe (02/10/2026) — UN INCONNU N'EST PAS UN ZÉRO. Un récidiviste est périmé sur au moins
+    // DEUX années de suivi, un chronique sur TROIS. Le texte du script était poussé sans condition :
+    // avec un seul fichier de suivi annuel déposé (septembre 2026, mais aussi juin et juillet), l'écran
+    // « Ce qui ne va pas » affichait « 0 récidivistes 2+ ans (aucun chronique) » pendant que le
+    // journal du même calcul disait l'historique INCOMPLET — août, avec ses quatre années, en
+    // comptait 27. Sur deux années, « (aucun chronique) » était de même un zéro par construction.
+    // Ce qui ne se mesure pas est dit non mesurable ; dès trois années, le texte du script revient
+    // au caractère près (banc de juin, quatre années, comparé à Python).
+    if(anneesSuivi.length<=1)
+      pfa.push("Récidivistes non mesurables : "+(anneesSuivi.length
+        ? "un seul fichier de suivi annuel déposé et lu (année "+anneesSuivi[0]+")"
+        : "aucun fichier de suivi annuel déposé et lu")+" — il en faut au moins deux années");
+    else if(chron.length) pfa.push(chron.length+" récidiviste(s) chronique(s) (≥3 ans)");
+    else pfa.push(recid.length+" récidivistes 2+ ans "+(anneesSuivi.length<3
+      ? "(chroniques ≥3 ans non mesurables : deux années de suivi seulement)" : "(aucun chronique)"));
     const adG=[]; gro.forEach((v,g)=>{ if(v.nb && v.nb_ad/v.nb*100>20) adG.push(g); }); // seuil sur valeur BRUTE
     if(adG.length) pfa.push("Grossistes %ARRIVE DATE >20% : "+adG.join(", "));
     if(rouges.length) ka.push({action:"FEFO renforcé rayons rouges ("+rouges.slice(0,3).map(e=>e.empl).join(", ")+")",
@@ -8930,7 +9877,9 @@ async function calculer(fichiers, config, equivalences){
          verdict:verdictRatio(ratio), seuil_vert:"<0.5", seuil_rouge:">1",
          tendance:tend, valeur_precedente:vprec, periode_precedente:pprec},
       ],
-      ventilation:{
+      ventilation: ventilationInconnue ? {
+        officine:{valeur:null, verdict:null}, para:{valeur:null, verdict:null},
+      } : {
         officine:{valeur:(ratioOff!==null?U.pyRound(ratioOff,3):null), verdict:verdictRatio(ratioOff)},
         para:{valeur:U.pyRound(ratioPara,3), verdict:verdictRatio(ratioPara)},
       },
@@ -9057,6 +10006,10 @@ glob.KemetModules.enregistrer({
      - le Python lit le mois précédent dans historique_para.json, posé sur le disque ;
        ici il vient de l'historique de l'officine, en mémoire (cfg.historique_mensuel).
        Même règle stricte : on ne compare QU'AU MOIS IMMÉDIATEMENT PRÉCÉDENT.
+     - 4e passe (02/10/2026) : le POIDS du mois précédent n'est repris que d'un résultat
+       marqué detail_para.ligne_totaux_exclue, c'est-à-dire calculé depuis la correction de
+       la ligne de total (voir parseSousEmpl). Avant elle, le CA total était doublé et le
+       poids publié à moitié : le comparer ferait croire que la para a doublé en un mois.
    ============================================================ */
 (function(glob){
 "use strict";
@@ -9128,7 +10081,15 @@ function parseSousEmpl(rows){
     if(nom === null || nom === undefined) continue;
     const s = U.strip(U.S(nom));
     if(!s) continue;
-    if(/^\d+$/.test(s.replace(/ /g,""))) continue;                 // ligne TOTAUX (col = compteur)
+    // 4e passe (02/10/2026) : le test numérique se fait sur U.C, PAS sur U.S — comme parseCA du
+    // pôle Achat, corrigé du même défaut. La ligne de total de Médiciel porte en colonne 1 le
+    // NOMBRE de sous-emplacements (89), le libellé « TOTAUX : » étant dans la colonne d'à côté.
+    // openpyxl rend un entier : str() Python donne « 89 », que isdigit() écarte. U.S mime
+    // str(float) et donnait « 89.0 », qui ÉCHAPPAIT au filtre : le total du fichier était compté
+    // comme un sous-emplacement, le CA total DOUBLAIT et le poids de la para était publié à
+    // moitié (septembre 2026 : 3,9 % au lieu de 7,8 %). Le nom gardé reste celui de U.S : seules
+    // les lignes dont la première cellule est un nombre entier changent de sort.
+    if(/^\d+$/.test(U.C(nom).replace(/ /g,""))) continue;          // ligne TOTAUX (col = compteur)
     const su = sa(s);
     if(su.indexOf("TOTAUX") === 0 || su.indexOf("EDITE") === 0 || su.indexOf("EDITÉ") === 0) continue;
     const ca = F(iCAf < r.length ? r[iCAf] : 0), mg = F(iMgf < r.length ? r[iMgf] : 0);
@@ -9263,7 +10224,21 @@ async function calculer(fichiers, config){
     let evCa = null, precCa = null, precPoids = null, precTaux = null, precLbl = null;
     if(precK && precK.detail_para){
       precCa = precK.detail_para.ca_para_hl;
-      precPoids = precK.detail_para.poids_para_hl;
+      /* 4e passe (02/10/2026) : LE POIDS D'UN MOIS ENREGISTRÉ AVANT LA CORRECTION N'EST PAS REPRIS.
+         Jusqu'à ce jour, parseSousEmpl comptait la ligne de total du fichier comme un
+         sous-emplacement : CA total doublé, poids publié à moitié (août 2026 : 3,9 % pour 7,8 %).
+         Le reprendre en « valeur précédente » ferait croire que la para a doublé en un mois. Seul
+         un résultat qui porte la marque ligne_totaux_exclue (posée plus bas depuis ce jour) est
+         comparé. Le CA para hors laits et le taux de marque n'étaient pas touchés : ils le restent. */
+      if(precK.detail_para.ligne_totaux_exclue === true) precPoids = precK.detail_para.poids_para_hl;
+      else if(precK.detail_para.poids_para_hl !== null && precK.detail_para.poids_para_hl !== undefined)
+        log("info","Poids de la para : pas de valeur précédente pour "+MTIT[pm].toLowerCase()+" "+py+
+          " — le résultat enregistré pour ce mois ne porte pas la marque d'un calcul fait depuis la "+
+          "correction du 02/10/2026 ; jusque-là, l'application comptait la ligne de total du fichier "+
+          "comme un sous-emplacement (CA total doublé, poids divisé par deux). Le CA para et le taux "+
+          "de marque, justes, restent comparés. Pour retrouver la comparaison du poids : recalculer "+
+          "ce mois-là (redéposer son CA par sous-emplacement en le choisissant à l'écran), puis "+
+          "ce mois-ci.");
       precTaux = precK.detail_para.taux_marge;
       precLbl = MTIT[pm]+" "+py;
       if(precCa) evCa = U.pyRound((aP.ca - precCa)/precCa*100, 1);
@@ -9303,6 +10278,9 @@ async function calculer(fichiers, config){
       detail_para: { ca_para_hl:aP.ca, ca_laits:aL.ca, ca_total:caTot, marge_para_hl:aP.mg,
         taux_marge:aP.taux, poids_para_hl:poidsP, poids_laits:poidsL,
         nb_sous_emplacements:paraHl.length,
+        // 4e passe (02/10/2026) : la marque d'un CA total lu SANS la ligne de total du fichier.
+        // Le mois suivant ne reprend le poids qu'à cette condition (voir la tendance ci-dessus).
+        ligne_totaux_exclue:true,
         top_5: top.slice(0,5).map(x=>({ nom:x.nom, ca:U.pyRound(x.ca,0),
           poids_para: aP.ca ? U.pyRound(x.ca/aP.ca*100,1) : 0.0 })) },
       points_forts:pointsForts, points_faibles:pointsFaibles, actions_recommandees:actionsRecommandees,
@@ -9339,10 +10317,13 @@ glob.KemetModulePerformancePara = { parseSousEmpl, agg, isPara, isLaitFarine, es
      taux de MARQUE = (PV_HT − PA) / PV_HT      pondéré par le STOCK
      PV_HT = PRIX VENTE TTC / (1 + TAUX TAXE)   PA = PRMP
 
-   UNE SEULE SOURCE : l'état de stock détaillé (le même « état n°20 » que le
-   groupe 1 du pôle Achat), à condition qu'il porte PRMP + PRIX VENTE TTC +
-   SOUS-EMPLACEMENT — trois colonnes cherchées par LIBELLÉ, jamais par position
-   (run_marge.py col(), L97-102).
+   UNE SEULE SOURCE : l'historique stock complet (le « B1 » du groupe 1 du pôle
+   Achat), à condition qu'il porte PRMP + PRIX VENTE TTC + SOUS-EMPLACEMENT en
+   ligne 1 — trois colonnes cherchées par LIBELLÉ, jamais par position
+   (run_marge.py col(), L97-102). 4e passe (02/10/2026) : PAS l'état n°20, que
+   ce texte nommait — il a bien ses prix de vente (« Prix Vente TTC »), mais il ne
+   porte pas les sous-emplacements (seulement les emplacements, en intertitres)
+   et ses colonnes ne sont pas en ligne 1.
 
    CLASSIFICATION PAR PÔLE — pole_of(), run_marge.py L79-87, PORTÉE LITTÉRALEMENT,
    PAS remplacée par U.poleParPrefixe() : cette fonction est plus riche que le socle
@@ -9359,11 +10340,17 @@ glob.KemetModulePerformancePara = { parseSousEmpl, agg, isPara, isLaitFarine, es
      - le Python DÉCOUVRE son fichier par find_etat_stock() (globs + repli hors
        dossier du mois, avec contrôle du nom si hors dossier) ; ici l'utilisateur
        DÉPOSE, et le fichier est reconnu par son EN-TÊTE (mêmes trois colonnes).
-       Comme ce module ne date pas son fichier par un « PERIODE DU », AUCUN
-       contrôle de période n'est possible — exactement comme le Python, qui ne
-       pose aucun contrôle de période sur CE fichier non plus (seulement sur le
-       NOM s'il vient d'ailleurs que le dossier du mois, cas qui ne s'applique
-       pas ici).
+       4e passe (02/10/2026) — ÉCART VOULU AU PYTHON : le B1 n'a aucune date dans
+       ses cellules, et ce module le prenait pour le mois de l'écran sans rien
+       vérifier — le B1 de juin déposé en septembre sortait « Septembre 2026 —
+       28,6 % ». Sa date se lit désormais dans le NOM DE SON ONGLET, où Médiciel
+       l'écrit (« VALEURS STOCKS - 30-06-26 » ; 5e passe, 03/10/2026), sinon dans
+       son NOM, avec son année (une mention « VALEUR DU STOCK AU », s'il en porte
+       une, passe avant les deux), par la MÊME
+       fonction que le délai d'écoulement (KemetPhotoStock, bloc
+       module-delai_ecoulement recopié dans cette application) : seul un B1 du
+       dernier jour du mois demandé est retenu ; les autres sont nommés, et sans
+       B1 valable rien n'est publié.
      - `points_faibles` (rayons à marge faible) est trié par `-marge` (comme
        `ray_rows`) puis filtré : IDENTIQUE au Python.
    ============================================================ */
@@ -9374,8 +10361,9 @@ const U = glob.KemetUtil, L = glob.KemetLecture;
 const MTIT = {1:"Janvier",2:"Février",3:"Mars",4:"Avril",5:"Mai",6:"Juin",7:"Juillet",
   8:"Août",9:"Septembre",10:"Octobre",11:"Novembre",12:"Décembre"};
 
-// La seule pièce nécessaire : l'état de stock détaillé (état n°20), partagée avec le groupe 1
-// du pôle Achat et avec module-performance_para.js utilise la pièce PA1 (CA), celle-ci PA2.
+// La seule pièce nécessaire : l'historique stock complet (le B1 ; 4e passe, 02/10/2026 — ce n'est
+// pas l'état n°20), partagé avec le groupe 1 du pôle Achat. module-performance_para.js utilise la
+// pièce PA1 (CA), celle-ci PA2.
 const PIECES_VUES = { etat_stock:"PA2" };
 
 function sa(v){ return U.normUpper(v); }
@@ -9404,6 +10392,11 @@ function poleDe(se, ray){
 /* ---------- reconnaissance et lecture de l'état de stock, col()/parse, L96-119 ---------- */
 function feuille(cl){
   return (cl.feuilles && cl.feuilles.indexOf("A") >= 0) ? L.lireFeuilleParNom(cl.wb,"A",cl.date1904) : cl.rows;
+}
+// 5e passe (03/10/2026) : le nom de l'onglet dont feuille() a lu les lignes — Médiciel y écrit la
+// date de l'historique du stock (« VALEURS STOCKS - 30-06-26 »).
+function ongletLu(cl){
+  return (cl.feuilles && cl.feuilles.indexOf("A") >= 0) ? "A" : cl.feuilleActive;
 }
 function trouverColonnes(head){
   // col(*names, d) — d'abord ÉGALITÉ, puis à défaut sous-chaîne — run_marge.py L97-102.
@@ -9501,27 +10494,59 @@ async function calculer(fichiers, config){
   try{
     const candidats = (fichiers||[]).filter(f=>/\.(xlsx|xls)$/i.test(f.nom||"") && (f.nom||"").indexOf("~$")<0);
     if(!candidats.length){
+      // 4e passe (02/10/2026) : le texte nommait l'état n°20, qui n'a pas de colonne
+      // SOUS-EMPLACEMENT ni d'en-tête en ligne 1. 5e passe (03/10/2026) : et il disait de le sortir
+      // le dernier jour et de le nommer — Médiciel le sort à la date choisie et l'écrit dans l'onglet.
       log("err","Analyse impossible : aucun classeur Excel dans ce dépôt. La marge a besoin de "+
-        "l'état de stock détaillé (état n°20 : PRMP + PRIX VENTE TTC + SOUS-EMPLACEMENT).");
+        "l'historique stock complet (« B1 » : PRMP + PRIX VENTE TTC + SOUS-EMPLACEMENT en ligne 1), "+
+        "à la date du dernier jour du mois : Médiciel l'écrit dans le nom de son onglet.");
+      return {erreur:true, journal:journal, pieces_vues:[...pieces]};
+    }
+    // 4e passe (02/10/2026) : la date du B1 est contrôlée par la règle du délai d'écoulement
+    // (KemetPhotoStock) — le dernier jour du mois demandé, et rien d'autre. Sans ce contrôle,
+    // la marge publiée serait celle d'un autre stock que celui du mois.
+    const P = glob.KemetPhotoStock;
+    if(!P){
+      log("err","Anomalie de construction de l'application : le contrôle de la date de l'historique "+
+        "stock (bloc « module-delai_ecoulement », recopié dans cette application) est absent.");
       return {erreur:true, journal:journal, pieces_vues:[...pieces]};
     }
     let src = null;
+    const b1Refuses = [];
     for(const f of candidats){
       try{
         const cl = await L.lireClasseur(f.buffer);
         const rows = feuille(cl);
-        if(estEtatStock(rows)){ src = { nom:f.nom, rows:rows }; break; }
+        if(!estEtatStock(rows)) continue;
+        const photo = P.examiner(f.nom, rows, Y+"-"+String(M).padStart(2,"0"), "ecran", ongletLu(cl));
+        if(!photo.ok){ b1Refuses.push(photo); continue; }
+        src = { nom:f.nom, rows:rows, photo:photo }; break;
       }catch(e){
         log("warn", f.nom+" — illisible, ignoré ("+L.messagePourJournal(e,70)+").");
       }
     }
+    for(const photo of b1Refuses)
+      log("warn","Historique stock ÉCARTÉ — "+photo.motif+" Il n'entre pas dans la marge.");
+    // 5e passe (03/10/2026) : « ce soir-là » devient « ce jour-là » — le B1 se sort à la date choisie.
+    if(!src && b1Refuses.length){
+      log("err","MARGE NON CALCULÉE — aucun historique stock déposé n'est la photo de la fin "+
+        P.deMois(Y, M)+" (voir ci-dessus). La marge théorique pondère les prix par le stock en "+
+        "magasin ce jour-là : sur la photo d'un autre jour, ce serait la marge d'un autre stock. "+
+        P.consigne({y:Y, m:M})+" Rien n'est publié.");
+      return {erreur:true, journal:journal, pieces_vues:[...pieces]};
+    }
     if(!src){
-      log("err","Analyse impossible : aucun état de stock détaillé (colonnes PRMP + PRIX VENTE "+
-        "+ SOUS-EMPLACEMENT en ligne 1) reconnu parmi les fichiers déposés.");
+      log("err","Analyse impossible : aucun historique stock complet (« B1 » : colonnes PRMP + PRIX "+
+        "VENTE + SOUS-EMPLACEMENT en ligne 1) reconnu parmi les fichiers déposés. L'état n°20 ne "+
+        "convient pas : il ne porte pas les sous-emplacements (seulement les emplacements, en "+
+        "intertitres) et ses colonnes ne sont pas en ligne 1.");
       return {erreur:true, journal:journal, pieces_vues:[...pieces]};
     }
     vu(PIECES_VUES.etat_stock);
-    log("ok", src.nom+" — état de stock détaillé reconnu.");
+    log("ok", src.nom+" — historique stock reconnu, photo du "+P.dateFR(src.photo.date)+" (date lue "+
+      "dans "+src.photo.source+") : la fin "+P.deMois(Y, M)+", le mois demandé.");
+    // 5e passe (03/10/2026) : un nom de fichier qui porte une autre date que l'onglet est dit ici.
+    if(src.photo.avertissement) log("warn", src.photo.avertissement);
 
     const prods = parseProduits(src.rows);
     if(!prods.length){
@@ -9702,6 +10727,9 @@ async function calculer(fichiers, config, equivalences){
     skill:"delai-ecoulement-para", kpi_id:"delai_ecoulement_para",
     date_analyse: k.date_analyse, periode_analysee: k.periode_analysee, scope:"para_hors_officine",
     indicateurs: [
+      // 6e passe (03/10/2026) : ces seuils sont désormais ceux du verdict republié — le module Achat
+      // juge la para sur le barème de la para, en Mode A comme en Mode C (« LE BARÈME DE LA PARA »).
+      // En Mode C, il donnait le verdict de l'officine : septembre 2026, 41,2 j « orange » sous « <45 ».
       { nom:"Délai d'écoulement para", valeur:vp.valeur, unite:"jours", verdict:vp.verdict,
         seuil_vert:"<45", seuil_orange:"45 à 75", seuil_rouge:">75",
         tendance:null, valeur_precedente:null, periode_precedente:null },
@@ -10310,6 +11338,396 @@ function moisLisibleCap(p){
   const t = moisLisible(p); return t.charAt(0).toUpperCase()+t.slice(1);
 }
 
+/* ---------- le mois du dépôt (01/10/2026) ----------
+   Mêmes règles, et mêmes fonctions RECOPIÉES À L'IDENTIQUE, que dans l'application Achat & Stock
+   (bloc « LE MOIS DU DÉPÔT » de son interface) : le banc test_mois_du_depot.js rejoue les trois
+   copies sur les mêmes cas. Ce pôle, bâti sur la mécanique du pôle Trésorerie, en avait les
+   défauts constatés le 01/10/2026 : ouverture sur le dernier mois analysé au lieu du mois à
+   clôturer, dépôt d'un autre mois rangé sous le mois affiché, écran réduit au dernier dépôt. */
+function cheminDuFichier(f){
+  return String((f && (f.webkitRelativePath || f.kpChemin)) || "");
+}
+// moisDuDepot : le mois d'un dépôt d'après le dossier d'où il vient (« …/2026-09/… »), et
+// seulement s'il est le seul de tout le lot.
+function moisDuDepot(files){
+  const vus = {};
+  for(const f of files){
+    const chemin = cheminDuFichier(f);
+    if(!chemin) continue;
+    const re = /(?:^|[\\/])(20\d{2})[-_](0[1-9]|1[0-2])(?:[\\/]|$)/g;
+    let m;
+    while((m = re.exec(chemin))) vus[m[1]+"-"+m[2]] = true;
+  }
+  const cles = Object.keys(vus);
+  return cles.length===1 ? cles[0] : null;
+}
+
+/* ================= LE MOIS DU DÉPÔT (01/10/2026) =================
+   Trois défauts constatés le 01/10/2026, jour où le Gérant vient déposer SEPTEMBRE :
+     1. l'application s'ouvrait sur le mois COURANT (octobre) — le pôle Trésorerie, lui, sur le
+        dernier mois analysé (août). Ni l'un ni l'autre n'est le mois que l'on collecte ;
+     2. le seul garde-fou de période lisait le chemin du sélecteur de dossier, vide au
+        glisser-déposer : septembre déposé sous octobre était rangé sous octobre, sans question ;
+     3. un second dépôt partiel REMPLAÇAIT les résultats du premier (rapprochement 92,7 % → 18,9 %,
+        réclamations 76,9 % → 0 %), sans que rien ne le signale.
+   Les fonctions de ce bloc sont RECOPIÉES À L'IDENTIQUE dans les interfaces des pôles Trésorerie
+   et Parapharmacie (aucun bloc commun n'est partagé par les trois interfaces) : le banc
+   test_mois_du_depot.js les rejoue toutes les trois sur les mêmes cas, une copie qui dériverait
+   le fait rougir. */
+
+// Décale un mois 'AAAA-MM' de n mois (n négatif : vers le passé). Arithmétique entière.
+function moisDecale(p, n){
+  const m = /^(\d{4})-(\d{2})$/.exec(String(p||""));
+  if(!m) return null;
+  const t = (+m[1])*12 + (+m[2]-1) + n;
+  return Math.floor(t/12)+"-"+String(t%12+1).padStart(2,"0");
+}
+
+// moisAOuvrir — LE MOIS AFFICHÉ À L'OUVERTURE. Le Gérant collecte le mois ÉCOULÉ : on se place sur
+// le mois à clôturer (M-1), SAUF si un mois plus récent — le mois courant — porte déjà des
+// analyses : on ouvre alors sur lui. Un mois postérieur au mois courant n'est jamais retenu, il ne
+// peut pas avoir été clos. (Règle à confirmer par le DG : voir le rapport du 01/10/2026.)
+function moisAOuvrir(historique, aujourdhui){
+  const d = aujourdhui || new Date();
+  const courant = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+  const aCloturer = moisDecale(courant, -1);
+  let dernier = null;
+  Object.keys(historique||{}).forEach(p=>{
+    if(!/^\d{4}-\d{2}$/.test(p) || p > courant) return;
+    if(!Object.keys(historique[p]||{}).length) return;
+    if(!dernier || p > dernier) dernier = p;
+  });
+  return (dernier && dernier > aCloturer) ? dernier : aCloturer;
+}
+
+// dateDeLEntete — la ligne « Période du 01/09/2026 au 30/09/2026 » que Médiciel imprime en tête
+// de ses états, lue dans les douze premières lignes de la première feuille. C'est une LECTURE, pas
+// un calcul. Seul un MOIS PLEIN compte (du 1er au dernier jour du même mois) : un export « jusqu'à
+// aujourd'hui », une quinzaine ou trois mois glissants ne datent rien. Un classeur illisible ou
+// protégé par mot de passe ne date rien non plus — jamais une erreur. Rend { mois, nature } ou
+// null ; `nature` nomme les deux seuls états que le guide demande AUSSI pour un mois antérieur :
+// « factures » (liste des factures clients) et « ca » (chiffre d'affaires par sous-emplacement).
+// ANCIEN TITRE DU CA RECONNU (01/10/2026, après contre-vérification). Avant 2026, Médiciel
+// intitulait l'état n°33 « LISTING DES PRODUITS VENDUS ». Le CA de mai 2025 rangé dans le dossier
+// de mai 2026 pour la comparaison N-1 des périmés — que ce module trouve par son NOM
+// « …CaParSousEmplacement… » — n'était pas reconnu comme tel : le dossier entier était refusé en
+// « mélange », et le message conseillait de retirer une pièce que le guide demande. Ce titre ne vaut
+// « ca » que si le NOM du fichier dit aussi « sous-emplacement », comme le lit le module des périmés.
+function dateDeLEntete(buffer, nom){
+  if(typeof XLSX === "undefined" || !buffer) return null;
+  try{
+    const wb = XLSX.read(new Uint8Array(buffer), { type:"array", sheetRows:12 });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    if(!ws) return null;
+    const txt = XLSX.utils.sheet_to_json(ws, { header:1, raw:false, defval:"" })
+      .map(l=>l.join(" ")).join(" ");
+    const m = /p[ée]riode\s+du\s*:?\s*(\d{2})\/(\d{2})\/(\d{4})\s+au\s*:?\s*(\d{2})\/(\d{2})\/(\d{4})/i.exec(txt);
+    if(!m) return null;
+    if(m[1] !== "01" || m[2] !== m[5] || m[3] !== m[6]) return null;
+    if(+m[4] !== new Date(+m[6], +m[5], 0).getDate()) return null;
+    const haut = txt.toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    const nomN = String(nom||"").toUpperCase().normalize("NFD").replace(/[^A-Z]/g, "");
+    const nature = /LISTE DES FACTURES CLIENT/.test(haut) ? "factures"
+                 : ((/CHIFFRE D.AFFAIRES? PAR SOUS.EMPLACEMENT/.test(haut) ||
+                     (/LISTING DES PRODUITS VENDUS/.test(haut) && /SOUSEMPL/.test(nomN))) ? "ca" : "");
+    return { mois: m[3]+"-"+m[2], nature: nature };
+  }catch(e){ return null; }
+}
+
+// Les indices du mois d'un lot : le dossier « AAAA-MM » d'où il vient, et l'en-tête de chaque état
+// Médiciel daté d'un mois plein. `lot` : [{nom, buffer}].
+function indicesDuChemin(files){
+  const m = moisDuDepot(files);
+  return m ? [{ source:"chemin", mois:m, nom:"le dossier « "+m+" »" }] : [];
+}
+function indicesDuContenu(lot){
+  const out = [];
+  (lot||[]).forEach(f=>{
+    if(!/\.(xlsx|xlsm|xls)$/i.test(String(f.nom||""))) return;
+    const d = dateDeLEntete(f.buffer, f.nom);
+    if(d) out.push({ source:"contenu", mois:d.mois, nature:d.nature, nom:f.nom });
+  });
+  return out;
+}
+
+// moisDuLot — le verdict, AVANT tout calcul :
+//   « accord »  : rien ne contredit le mois affiché (ou rien n'est daté) ;
+//   « autre »   : rien ne désigne le mois affiché, et tout ce qui est daté s'explique par UN autre
+//                 mois — on propose de basculer dessus ;
+//   « melange » : le lot mêle des pièces de plusieurs mois — aucun calcul ne peut être juste ;
+//   « incertain » (01/10/2026, après contre-vérification) : rien ne désigne le mois affiché, et
+//                 PLUSIEURS mois expliquent tout le lot — on ne choisit pas à la place du Gérant.
+//                 Défaut d'origine : un lot dont le seul état daté était le CA de septembre 2025,
+//                 octobre affiché, faisait dire « Ce dépôt est celui de SEPTEMBRE 2025 », alors
+//                 qu'il pouvait tout aussi bien être le CA « an dernier » de septembre 2026.
+//                 Un mois POSTÉRIEUR au mois courant n'est jamais candidat : il n'a pas eu lieu.
+// LES MOIS ANTÉRIEURS QUE LE GUIDE DEMANDE ne contredisent rien, mais seulement pour l'état qui les
+// porte : la liste des factures clients de M-2, M-3 et M-4 (recouvrement) et le chiffre d'affaires
+// du même mois l'an dernier (M-12). Un état de caisse d'il y a deux mois, lui, n'a rien à faire
+// dans le lot. Un DOSSIER ne porte qu'un mois : son nom n'est jamais « antérieur demandé ».
+const ANTERIEURS_DEMANDES = { factures:[2, 3, 4], ca:[12] };
+function moisDuLot(indices, periode, aujourdhui){
+  const liste = indices || [];
+  const jour = aujourdhui || new Date();
+  const courant = jour.getFullYear()+"-"+String(jour.getMonth()+1).padStart(2,"0");
+  const evaluer = function(p){
+    const r = { accords:[], neutres:[], desaccords:{} };
+    liste.forEach(x=>{
+      const ecarts = (x.source === "contenu" && ANTERIEURS_DEMANDES[x.nature]) || [];
+      if(x.mois === p) r.accords.push(x);
+      else if(ecarts.some(k=>moisDecale(p, -k) === x.mois)) r.neutres.push(x);
+      else (r.desaccords[x.mois] = r.desaccords[x.mois] || []).push(x);
+    });
+    return r;
+  };
+  const e = evaluer(periode);
+  if(!Object.keys(e.desaccords).length) return { statut:"accord", mois:periode, indices:e };
+  if(!e.accords.length){
+    // Les mois candidats : chacun de ceux que le lot cite, et celui que désignerait chaque pièce
+    // « antérieure demandée ». On garde ceux qui expliquent TOUT le lot. S'il en reste UN, c'est
+    // le mois du lot ; s'il en reste plusieurs, le lot ne dit pas son mois (« incertain »).
+    const candidats = {};
+    liste.forEach(x=>{
+      candidats[x.mois] = true;
+      ((x.source === "contenu" && ANTERIEURS_DEMANDES[x.nature]) || []).forEach(k=>{
+        candidats[moisDecale(x.mois, k)] = true; });
+    });
+    const coherents = Object.keys(candidats).filter(q=>q !== periode && q <= courant)
+      .map(q=>({ q:q, e:evaluer(q) })).filter(c=>!Object.keys(c.e.desaccords).length)
+      .sort((a,b)=>(a.q < b.q ? -1 : 1));
+    if(coherents.length === 1) return { statut:"autre", mois:coherents[0].q, indices:coherents[0].e };
+    if(coherents.length > 1) return { statut:"incertain", mois:null, candidats:coherents.map(c=>c.q),
+                                      indices:e, liste:liste };
+  }
+  return { statut:"melange", mois:null, indices:e };
+}
+// Ce qui date le lot, en clair : « le dossier « 2026-09 » ; 4 états Médiciel datés de ce mois (…) ».
+function preuvesDuMois(e){
+  const out = e.accords.filter(x=>x.source === "chemin").map(x=>x.nom);
+  const etats = e.accords.filter(x=>x.source === "contenu").map(x=>x.nom);
+  const liste = function(t){ return t.slice(0,4).join(", ")+(t.length>4 ? ", …" : ""); };
+  if(etats.length) out.push(etats.length+" état"+(etats.length>1?"s":"")+" Médiciel daté"+
+    (etats.length>1?"s":"")+" de ce mois ("+liste(etats)+")");
+  if(e.neutres.length) out.push(e.neutres.length+" état"+(e.neutres.length>1?"s":"")+" d'un mois "+
+    "antérieur que le guide demande pour ce mois-là ("+liste(e.neutres.map(x=>x.nom))+")");
+  return out.join(" ; ");
+}
+
+/* UN RÉSULTAT DÉJÀ ENREGISTRÉ N'EST REMPLACÉ QUE PAR UN CALCUL QUI PORTE SES PIÈCES (01/10/2026).
+   Chaque calcul enregistré laisse une TRACE dans journal_analyses (champ déjà prévu par la fiche,
+   resté vide jusqu'ici, et que la synchro sait fusionner) : le nombre de fichiers que le module a
+   reconnus et, quand le module les annonce, les pièces du guide (T3, T4…). Un dépôt qui en apporte
+   MOINS ne remplace pas le résultat : on le garde, et on le DIT. Un résultat enregistré avant le
+   01/10/2026 (ou importé d'un kpi_summary) n'a pas de trace : on ne sait pas sur combien de pièces
+   il reposait. Un inconnu n'est pas un zéro : il n'est pas remplacé sans que le Gérant le décide.
+   RÉVISÉ LE 01/10/2026 APRÈS CONTRE-VÉRIFICATION. La première version disait d'un résultat SANS
+   trace qu'il avait été « calculé sur PLUS de pièces », « d'avant le 01/10/2026 », et conseillait de
+   le garder : redéposer le dossier COMPLET d'août gardait ainsi un rapprochement à 0 % au lieu de
+   92,7 %, sous un bandeau parlant de « chiffre amputé ». Or d'un résultat sans trace on ne sait
+   RIEN — ni plus, ni moins de pièces. Chaque cas a désormais son motif vrai et son conseil :
+     « pieces »   la trace nomme des pièces du guide que ce dépôt n'a pas      → garder, conseillé ;
+     « fichiers » ce dépôt apporte moins de fichiers que le calcul enregistré → garder, conseillé —
+                  le motif dit que le calcul neuf est le bon si des doublons ont été retirés exprès ;
+     « inconnu »  aucune trace                                               → remplacer, conseillé
+                  si ce dépôt est le dossier ENTIER du mois ; aucun conseil sinon.
+   Jamais de conseil de GARDER un résultat NON PUBLIABLE face à un calcul publiable — un compte de
+   fichiers ne peut pas préférer un refus à un chiffre —, ni de REMPLACER un chiffre publié par un
+   NON PUBLIABLE : ces cas restent sans conseil, et le motif le dit. Le conseil va sur « OK »
+   (trancherRemplacements) ; sans conseil, « OK » garde ce qui est déjà en mémoire, et c'est DIT. */
+function estNonPubliable(k){
+  return String((k && k.statut) || "").toUpperCase().indexOf("NON PUBLIABLE") >= 0;
+}
+function traceDuCalcul(officine, periode, kpiId){
+  let t = null;
+  ((officine && officine.journal_analyses) || []).forEach(e=>{
+    if(!e || e.origine !== "depot" || e.periode !== periode || e.kpi_id !== kpiId) return;
+    if(!t || String(e.date_heure||"") >= String(t.date_heure||"")) t = e;
+  });
+  return t;
+}
+function noterCalcul(officine, periode, kpiId, nbFichiers, pieces, titre){
+  if(!officine) return;
+  if(!Array.isArray(officine.journal_analyses)) officine.journal_analyses = [];
+  const refs = (pieces||[]).slice().sort();
+  officine.journal_analyses.push({ periode:periode, date_heure:new Date().toISOString(),
+    origine:"depot", kpi_id:kpiId, fichiers:+nbFichiers||0, pieces:refs,
+    resume:String(titre||kpiId)+" calculé sur "+(+nbFichiers||0)+" fichier(s)"+
+      (refs.length ? " — pièces "+refs.join(", ") : "") });
+}
+function decisionRemplacement(stocke, trace, nouveau, nbFichiers, pieces, dossierDuMois){
+  if(!stocke) return { remplacer:true, cas:"", conseil:"", motif:"" };
+  const nb = +nbFichiers || 0, refs = pieces || [];
+  const npAvant = estNonPubliable(stocke), npApres = estNonPubliable(nouveau);
+  const nuance = npAvant === npApres ? ""
+    : (npAvant ? " ; le résultat enregistré est NON PUBLIABLE, ce calcul-ci est publiable"
+               : " ; ce calcul-ci est NON PUBLIABLE, le résultat enregistré est publié");
+  if(trace){
+    const d = String(trace.date_heure||"");
+    const quand = d.length >= 10 ? " (calcul du "+d.slice(8,10)+"/"+d.slice(5,7)+"/"+d.slice(0,4)+")" : "";
+    const manque = (trace.pieces||[]).filter(r=>refs.indexOf(r) < 0);
+    if(manque.length)
+      return { remplacer:false, cas:"pieces", conseil:(npAvant && !npApres) ? "" : "garder",
+        motif:"ce dépôt ne contient pas "+(manque.length>1 ? "les pièces " : "la pièce ")+manque.join(", ")+
+          ", qui avai"+(manque.length>1 ? "ent" : "t")+" servi au résultat enregistré"+quand+nuance };
+    if(nb < (+trace.fichiers||0))
+      return { remplacer:false, cas:"fichiers", conseil:(npAvant && !npApres) ? "" : "garder",
+        motif:"ce dépôt n'apporte que "+nb+" fichier"+(nb>1 ? "s" : "")+" à cet indicateur, contre "+
+          trace.fichiers+" pour le résultat enregistré"+quand+" — si vous avez retiré exprès des "+
+          "fichiers en double ou erronés, c'est au contraire ce calcul-ci qui est juste"+nuance };
+    return { remplacer:true, cas:"", conseil:"", motif:"" };
+  }
+  return { remplacer:false, cas:"inconnu", conseil:(dossierDuMois && !(npApres && !npAvant)) ? "remplacer" : "",
+    motif:"l'application ne sait pas sur combien de pièces repose le résultat enregistré : il a été "+
+      "calculé avant qu'elle ne le note, ou importé"+nuance };
+}
+
+// valeurLisible (01/10/2026) — la valeur principale d'un résultat, telle que sa carte la montre : la
+// question « garder ou remplacer ? » met les deux chiffres sous les yeux du Gérant.
+// 3e passe, même jour (2e contre-vérification) : (1) la ligne nomme le MODULE (« Écart de caisse »)
+// et la valeur est celle du PREMIER indicateur — « 83,9 % » était le taux de conformité, pas un
+// écart : quand leurs noms diffèrent, l'indicateur est nommé ; (2) un résultat NON PUBLIABLE montre
+// aussi son chiffre mesuré — « enregistré : 0 % ; ce dépôt : NON PUBLIABLE » ne laissait pas voir
+// que le 0 % était faux ; (3) les milliers sont séparés (« 4965854 FCFA »).
+function valeurLisible(k, nomAffiche){
+  if(!k) return "aucun";
+  const np = estNonPubliable(k);
+  const src = np ? (k._brut_non_publiable || null) : k;
+  const i = ((src && src.indicateurs) || [])[0];
+  let txt = "";
+  if(i && i.valeur !== null && i.valeur !== undefined && i.valeur !== ""){
+    if(typeof i.valeur === "number"){
+      const r = Math.round(i.valeur*100)/100, p = String(Math.abs(r)).split(".");
+      txt = (r < 0 ? "-" : "") + p[0].replace(/\B(?=(\d{3})+(?!\d))/g, "\u00a0") + (p[1] ? ","+p[1] : "");
+    } else txt = String(i.valeur);
+    const u = String(i.unite || "").trim();
+    txt += u ? (u === "%" ? " %" : " "+u) : "";
+  }
+  const pareil = function(a, b){ return String(a||"").trim().toLowerCase() === String(b||"").trim().toLowerCase(); };
+  const nomI = (txt && i.nom && nomAffiche && !pareil(i.nom, nomAffiche)) ? String(i.nom) : "";
+  if(np) return "NON PUBLIABLE" + (txt ? " (chiffre mesuré mais non publié : "+txt+(nomI ? ", « "+nomI+" »" : "")+")" : "");
+  return txt ? txt + (nomI ? " (« "+nomI+" »)" : "") : "sans valeur";
+}
+
+// deMois (01/10/2026) — « de septembre 2026 », « d'août 2026 », « d'octobre 2026 » : l'élision que le
+// français exige devant une voyelle. La première version écrivait « pas de octobre 2026 ».
+function deMois(p, majuscules){
+  const m = moisLisible(p);
+  return (/^[aeiouyàâäéèêëîïôöùûüh]/i.test(m) ? "d'" : "de ")+(majuscules ? m.toUpperCase() : m);
+}
+
+// trancherRemplacements (01/10/2026) — les questions « garder ou remplacer ? », UNE par dépôt et par
+// sorte de conseil (trois au plus, une seule d'ordinaire). Chacune met sous les yeux, indicateur par
+// indicateur, la valeur enregistrée, celle du dépôt et le motif VRAI, et dit ce que fait « OK » :
+//   · conseil « garder »    : le résultat enregistré a été calculé avec des pièces ou des fichiers
+//                             que ce dépôt n'apporte pas — « OK » garde (conseillé) ;
+//   · aucun conseil         : l'application ne peut pas dire lequel des deux résultats doit faire
+//                             foi — « OK » garde ce qui est déjà en mémoire, comme avant le
+//                             dépôt, et la question le DIT au lieu de « recommander » quoi que ce soit ;
+//   · conseil « remplacer » : un résultat sans trace, face au dossier ENTIER de son mois — « OK »
+//                             remplace (conseillé si ce dossier est complet).
+// Trois sortes, trois questions : une même réponse ne doit jamais trancher à la fois des cas où
+// l'application conseille de garder et des cas où elle ne sait pas.
+// `items` : [{ nom, mois, avant, apres, decision }] ; chacun ressort marqué garder:true|false.
+function trancherRemplacements(items, dossier){
+  const ligne = function(x){
+    const m = String(x.decision.motif || "");
+    return "· "+x.nom+" ("+moisLisible(x.mois)+") — enregistré : "+valeurLisible(x.avant, x.nom)+
+      " ; ce dépôt : "+valeurLisible(x.apres, x.nom)+".\n   "+m.charAt(0).toUpperCase()+m.slice(1)+".";
+  };
+  const debut = function(liste, suite){
+    const pl = liste.length > 1;
+    return liste.length+" indicateur"+(pl?"s":"")+" de ce dépôt "+(pl?"ont":"a")+" déjà un résultat "+
+      "enregistré, "+suite+" :\n\n"+liste.map(ligne).join("\n")+"\n\n";
+  };
+  const leurs = function(liste){
+    return liste.length > 1 ? "les résultats déjà enregistrés" : "le résultat déjà enregistré";
+  };
+  const aGarder = items.filter(x=>x.decision.conseil === "garder");
+  const sansConseil = items.filter(x=>x.decision.conseil !== "garder" && x.decision.conseil !== "remplacer");
+  const aRemplacer = items.filter(x=>x.decision.conseil === "remplacer");
+  if(aGarder.length){
+    const ok = confirm(debut(aGarder, "calculé avec des pièces ou des fichiers que ce dépôt n'apporte pas")+
+      "OK : garder "+leurs(aGarder)+" (conseillé).\n"+
+      "Annuler : "+(aGarder.length > 1 ? "les" : "le")+" remplacer par le calcul de ce dépôt.");
+    aGarder.forEach(x=>{ x.garder = !!ok; });
+  }
+  if(sansConseil.length){
+    const ok = confirm(debut(sansConseil, "et l'application ne peut pas vous conseiller l'un plutôt que "+
+      "l'autre")+
+      "À vous de trancher : si ce dépôt est le dossier complet du mois, remplacez ; s'il n'apporte qu'un "+
+      "document arrivé en retard, gardez.\n\n"+
+      "OK : garder "+leurs(sansConseil)+".\n"+
+      "Annuler : "+(sansConseil.length > 1 ? "les" : "le")+" remplacer par le calcul de ce dépôt.");
+    sansConseil.forEach(x=>{ x.garder = !!ok; });
+  }
+  if(aRemplacer.length){
+    const ok = confirm(debut(aRemplacer, "dont l'application ne sait pas sur combien de pièces "+
+      (aRemplacer.length > 1 ? "ils reposent" : "il repose"))+
+      "Ce dépôt est le dossier « "+dossier+" » entier : s'il est complet, c'est lui qui doit faire foi.\n\n"+
+      "OK : remplacer par le calcul de ce dépôt (conseillé si ce dossier est complet).\n"+
+      "Annuler : garder "+leurs(aRemplacer)+".");
+    aRemplacer.forEach(x=>{ x.garder = !ok; });
+  }
+  return items;
+}
+// accepterMoisDuLot (01/10/2026) : le lot contredit le mois affiché (voir moisDuLot). On NE CALCULE
+// PAS : un clic pour basculer sur le mois du lot, ou rien. Rend vrai si le dépôt peut continuer.
+// « Annuler » abandonne le dépôt — il ne le poursuit JAMAIS sur le mois affiché : c'est exactement
+// ce qui rangeait les fichiers de juillet sous août (17/08/2026), puis septembre sous octobre.
+function accepterMoisDuLot(v, affiche, basculer){
+  if(v.statut === "autre"){
+    const preuves = preuvesDuMois(v.indices);
+    const ok = confirm("Ce dépôt est celui "+deMois(v.mois, true)+", pas "+
+      deMois(affiche)+" (le mois affiché).\n\nCe qui le dit : "+preuves+".\n\n"+
+      "OK : passer sur "+moisLisible(v.mois)+" et analyser ce dépôt.\n"+
+      "Annuler : ne rien analyser — rien n'est calculé ni enregistré.");
+    if(!ok){
+      journalLigne("err", "Dépôt NON analysé, à votre demande : ses pièces sont "+deMois(v.mois)+
+        " ("+preuves+"), le mois affiché est "+moisLisible(affiche)+". Rien n'a été calculé ni "+
+        "enregistré. Choisissez le bon mois en haut de l'écran, puis redéposez.");
+      return false;
+    }
+    basculer(v.mois);
+    journalLigne("ok", "Mois d'analyse aligné sur le dépôt : "+moisLisible(v.mois)+" ("+preuves+").");
+    return true;
+  }
+  // « incertain » (01/10/2026, après contre-vérification) : plusieurs mois expliquent le lot. On ne
+  // propose pas l'un d'eux — la version précédente proposait septembre 2025 pour le seul CA « an
+  // dernier » de septembre 2026 — : on le dit, et rien n'est calculé.
+  if(v.statut === "incertain"){
+    const possibles = v.candidats.map(p=>deMois(p)).join(" ou ");
+    alert("Ce dépôt n'est pas "+deMois(affiche)+" (le mois affiché), mais ses pièces datées ne "+
+      "suffisent pas à dire de quel mois il est : il peut être "+possibles+".\n\nCe qui est daté : "+
+      (v.liste||[]).map(x=>x.nom+" ("+moisLisible(x.mois)+")").join(", ")+".\n\n"+
+      "Le CA par sous-emplacement et les listes de factures clients sont aussi demandés pour des mois "+
+      "antérieurs (l'an dernier ; M-2 à M-4) : seuls, ils ne désignent pas le mois du dépôt. Rien n'a été "+
+      "analysé. Choisissez le bon mois en haut de l'écran, puis redéposez.");
+    journalLigne("err", "Dépôt NON analysé : ses pièces datées peuvent être "+possibles+", pas "+
+      deMois(affiche)+" (le mois affiché). Rien n'a été calculé ni enregistré.");
+    return false;
+  }
+  const lignes = [];
+  if(v.indices.accords.length)
+    lignes.push(moisLisibleCap(affiche)+" : "+v.indices.accords.map(x=>x.nom).join(", "));
+  Object.keys(v.indices.desaccords).sort().forEach(m=>{
+    lignes.push(moisLisibleCap(m)+" : "+v.indices.desaccords[m].map(x=>x.nom).join(", "));
+  });
+  // TEXTE CORRIGÉ LE 01/10/2026 (contre-vérification) : il affirmait « Un calcul fait sur ce mélange
+  // serait faux », ce que l'application ne sait pas — un état d'un autre mois qu'aucun indicateur ne
+  // lit ne fausse rien — et il faisait retirer sans distinction des pièces que le guide demande.
+  alert("Ce dépôt contient des pièces datées de plusieurs mois : rien n'a été analysé.\n\n"+
+    lignes.join("\n")+"\n\nLes indicateurs choisissent leurs fichiers d'après leur contenu : l'un d'eux "+
+    "pourrait lire l'état d'un autre mois à la place de celui du mois voulu, sans que rien ne le "+
+    "signale. Rangez ailleurs les fichiers qui ne sont pas du mois voulu, choisissez ce mois en haut de "+
+    "l'écran, puis redéposez.\n\nPeuvent rester dans le dossier, parce que le guide les demande : les "+
+    "listes de factures clients des mois M-2, M-3 et M-4, et le CA par sous-emplacement du même mois "+
+    "l'an dernier.");
+  journalLigne("err", "Dépôt NON analysé : il mélange des pièces de plusieurs mois (mois affiché : "+
+    moisLisible(affiche)+"). Rien n'a été calculé ni enregistré.");
+  lignes.forEach(l=>journalLigne("err", "  "+l));
+  return false;
+}
+
 /* ---------- période ---------- */
 function peuplerPeriodes(){
   const sel = document.getElementById("sel-periode");
@@ -10364,6 +11782,20 @@ const MOT = { vert:"Conforme", orange:"Vigilance", rouge:"Urgent", "n/a":"Non ca
 function forme(v){ return v==="vert" ? "conforme" : (v==="rouge" ? "urgent"
                  : (v==="orange" ? "vigilance" : "absent")); }
 
+/* 6e passe (03/10/2026) — UN VERDICT DU DÉLAI PARA ENREGISTRÉ AVANT LE BARÈME DE LA PARA. Le module
+   Achat juge désormais la para sur son barème (vert sous 45 j, orange de 45 à 75 j, rouge au-delà de
+   75 j) ; une fiche calculée avant le 03/10/2026 (Mode C) porte le verdict de l'officine — 41,2 j
+   « Vigilance » sous « Objectif : <45 ». Elle n'est pas réécrite : la carte le dit, et dit quoi faire.
+   Le barème est celui du module (window.KemetBaremePara, recopié ici avec lui) : une seule règle. */
+const MOTIF_ANCIEN_BAREME = "Verdict enregistré avant le 03/10/2026, sur le barème de l'officine : "+
+  "déposez de nouveau les fichiers du mois pour le juger sur le barème de la para.";
+function paraSurAncienBareme(k, ind){
+  const juge = window.KemetBaremePara && window.KemetBaremePara.verdict;
+  if(!juge || !k || k.kpi_id !== "delai_ecoulement_para" || !ind) return false;
+  if(ind.valeur === null || ind.valeur === undefined || !ind.verdict) return false;
+  return juge(Number(ind.valeur)) !== ind.verdict;
+}
+
 function rendreCartes(resultats){
   let html = "";
   for(const r of resultats){
@@ -10387,7 +11819,8 @@ function rendreCartes(resultats){
           ? '<div class="kp-kpi__motif">'+esc(ind.note || k._note || "")+'</div>'
           : '<div class="kp-kpi__period">'+
             (ind.seuil_vert ? esc("Objectif : "+ind.seuil_vert) : "Aucun objectif chiffré")+
-            esc(k.periode_analysee ? " · "+k.periode_analysee : "")+'</div>')+
+            esc(k.periode_analysee ? " · "+k.periode_analysee : "")+'</div>'+
+            (paraSurAncienBareme(k, ind) ? '<div class="kp-kpi__motif">'+esc(MOTIF_ANCIEN_BAREME)+'</div>' : ""))+
         '</div></div>';
     }
   }
@@ -10685,6 +12118,20 @@ function tracer(cle){
 // (ligne ci-dessus, addEventListener("change", ...)) -- une seule chaine, deux usages.
 const TITRE_SUFFIXE = " — Parapharmacie";
 let dernierFichiers = null; // pour rejouer le meme depot apres bascule de periode
+// basculerSur (01/10/2026) : change le mois affiché par programme, comme le sélecteur de l'en-tête.
+// Le mois visé est AJOUTÉ à la liste s'il n'y figure pas : sans cela `sel.value` ne prendrait pas,
+// et l'écran afficherait un mois pendant que le dépôt en traiterait un autre.
+function basculerSur(p){
+  const sel = document.getElementById("sel-periode");
+  if(sel && ![...sel.options].some(o=>o.value === p)){
+    const o = document.createElement("option");
+    o.value = p; o.textContent = moisLisibleCap(p);
+    sel.appendChild(o);
+  }
+  if(sel) sel.value = p;
+  etat.periode = p;
+  document.getElementById("titre-ecran").textContent = moisLisibleCap(p)+TITRE_SUFFIXE;
+}
 async function traiterDepot(fileList){
   const files = Array.from(fileList||[]);
   if(!files.length){
@@ -10697,7 +12144,11 @@ async function traiterDepot(fileList){
   dernierFichiers = files;
   document.getElementById("alerte-periode").innerHTML = "";
   journalVider();
-  etat.resultats = [];
+  // L'ÉCRAN N'EST PLUS RÉDUIT AU DERNIER DÉPÔT (01/10/2026). Défaut d'origine : `etat.resultats`
+  // était vidé ici, puis ne recevait que les indicateurs de CE dépôt. Après le dépôt des relevés
+  // bancaires, l'écran du pôle Trésorerie disait « 1 indicateur calculé sur 5 » ; ce pôle, bâti
+  // sur la même mécanique, avait le même défaut. L'écran est désormais rechargé à la fin depuis la
+  // mémoire du mois (afficherMemoire), qui porte tout.
   ["bloc-cartes","bloc-detail","bloc-lecture","bloc-sortie"]
     .forEach(id=>document.getElementById(id).classList.add("masque"));
 
@@ -10725,9 +12176,31 @@ async function traiterDepot(fileList){
   journalLigne("info", lot.length+" fichier(s) déposé(s). Les modules du pôle vont y chercher "+
     "ce qu'ils reconnaissent.");
 
+  // ---- LE MOIS DU LOT, AVANT TOUT CALCUL (01/10/2026) ----
+  // Le contrôle de période vivait dans un seul module de ce pôle, et APRÈS calcul. Il est fait ici
+  // d'abord, pour tous, comme dans les pôles Achat et Trésorerie :
+  // dossier d'origine (sélecteur ou glisser-déposer) et en-tête des états Médiciel datés. Un lot
+  // qui contredit le mois affiché n'est pas calculé : un clic pour basculer, ou l'abandon.
+  const verdictMois = moisDuLot(indicesDuChemin(files).concat(indicesDuContenu(lot)), etat.periode);
+  if(verdictMois.statut !== "accord" && !accepterMoisDuLot(verdictMois, etat.periode, basculerSur)){
+    afficherMemoire();
+    // 3e passe (01/10/2026) : un motif par cas. « ses pièces ne sont pas du mois affiché » était
+    // faux pour un dossier qui MÊLE des pièces du mois affiché et d'autres mois.
+    afficherResumeDepot(files.length, lot.length, 0, "Dépôt non analysé : "+
+      (verdictMois.statut === "melange" ? "il mêle des pièces de plusieurs mois"
+       : verdictMois.statut === "incertain" ? "son mois ne peut pas être établi (plusieurs mois possibles)"
+       : "ses pièces ne sont pas du mois affiché")+
+      ". Rien n'a été calculé ni enregistré — le détail est dans le journal.");
+    return;
+  }
+  const periode = etat.periode;
+  const off = MEM.etat.officine;
+  // Le dossier « AAAA-MM » d'où vient le dépôt, s'il y en a un (01/10/2026) : un résultat enregistré
+  // sans trace de ses pièces n'est conseillé au remplacement que par le dossier ENTIER de son mois.
+  const moisDuDossier = moisDuDepot(files);
+
   const rejetsPeriode = [];
-  const vuesDepot = new Set();
-  const partiellesDepot = {};
+  const calcules = [];
   // SEULS les modules de la liste blanche produisent une carte de ce pôle. "delai_ecoulement"
   // et "peremptions" (les modules du pôle Achat, présents dans le registre pour que les
   // adaptateurs les appellent) sont volontairement SAUTÉS ici : les appeler nous-mêmes
@@ -10745,8 +12218,8 @@ async function traiterDepot(fileList){
     let res;
     try{
       res = await module.calculer(lot, {
-        periode: etat.periode,
-        historique_mensuel: (MEM.etat.officine && MEM.etat.officine.historique_mensuel) || {},
+        periode: periode,
+        historique_mensuel: (off && off.historique_mensuel) || {},
       }, {});
     }catch(e){
       journalLigne("err", "["+module.titre+"] erreur inattendue pendant le calcul : "+
@@ -10755,27 +12228,109 @@ async function traiterDepot(fileList){
     }
     (res.journal||[]).forEach(j=>journalLigne(j.niv||"info", "["+module.titre+"] "+j.msg));
     if(res.periode_rejetee) rejetsPeriode.push(res.periode_rejetee);
-    (res.pieces_vues||[]).forEach(r=>vuesDepot.add(r));
-    Object.assign(partiellesDepot, res.pieces_partielles || {});
-    if(res.erreur || !res.kpiSummary) continue;
-    etat.resultats.push({ titre: module.titre, kpi: res.kpiSummary });
-    SV.upsertPeriode(MEM.etat.officine, etat.periode, res.kpiSummary.kpi_id, res.kpiSummary);
+    calcules.push({ module:module, res:res, nb:detectes.length });
   }
 
-  const off = MEM.etat.officine;
+  // ---- UN LOT QUI PORTE UN AUTRE MOIS N'ÉCRIT RIEN (01/10/2026) ----
+  // Défaut d'origine : quand un module reconnaissait des pièces d'un autre mois (periode_rejetee),
+  // les AUTRES résultats du même lot étaient enregistrés quand même sous le mois affiché, sans
+  // contrôle de leur mois (même défaut que celui constaté dans le pôle Trésorerie), et les pièces
+  // du mois affiché se cochaient avec des fichiers d'un autre mois. Désormais : rien n'est écrit.
+  if(rejetsPeriode.length){
+    journalLigne("err", "Rien n'a été enregistré pour "+moisLisible(periode)+" : des pièces de ce "+
+      "dépôt sont d'un autre mois (voir le bandeau en haut de la page). Aucun résultat, aucune "+
+      "pièce n'est rangé sous un mois qui n'est pas le sien.");
+    afficherMemoire();
+    afficherAlertePeriode(rejetsPeriode);
+    afficherResumeDepot(files.length, lot.length, 0, "Dépôt non enregistré : des pièces sont d'un "+
+      "autre mois que celui affiché. Voir le bandeau en haut de la page.");
+    return;
+  }
+
+  // ---- ENREGISTREMENT, INDICATEUR PAR INDICATEUR (01/10/2026) ----
+  // Un résultat déjà enregistré pour ce mois n'est remplacé que par un calcul qui porte ses pièces
+  // (decisionRemplacement) ; sinon le Gérant tranche, sur le motif vrai de chaque indicateur
+  // (trancherRemplacements, revu le 01/10/2026), et ce qui est gardé est DIT.
+  const hist = (off && off.historique_mensuel) || {};
+  const vuesDepot = new Set();
+  const partiellesDepot = {};
+  const refsDeposees = new Set();
+  const ecrits = [];
+  const enAttente = [];
+  const relever = function(c){
+    (c.res.pieces_vues||[]).forEach(r=>{ vuesDepot.add(r); refsDeposees.add(r); });
+    Object.assign(partiellesDepot, c.res.pieces_partielles || {});
+  };
+  const enregistrer = function(c){
+    const k = c.res.kpiSummary;
+    SV.upsertPeriode(off, periode, k.kpi_id, k);
+    noterCalcul(off, periode, k.kpi_id, c.nb, c.res.pieces_vues, c.module.titre);
+    ecrits.push(k.kpi_id);
+    relever(c);
+  };
+  for(const c of calcules){
+    const kid = (c.res.kpiSummary && c.res.kpiSummary.kpi_id) || c.module.kpi_id;
+    const stocke = (hist[periode] || {})[kid] || null;
+    if(c.res.erreur || !c.res.kpiSummary){
+      // Les pieces reconnues sont relevees MEME quand le module refuse de conclure : un refus
+      // qui remettrait toutes les cases en « a fournir » ferait redeposer des fichiers deja la.
+      // SAUF quand un résultat est déjà enregistré pour ce mois (01/10/2026) : un dépôt qui ne le
+      // recalcule pas n'a pas à réécrire l'état des pièces qui l'ont produit.
+      if(stocke) journalLigne("info", "["+c.module.titre+"] ce dépôt ne permet pas de le recalculer : "+
+        "le résultat déjà enregistré pour "+moisLisible(periode)+" est conservé.");
+      else relever(c);
+      continue;
+    }
+    const d = decisionRemplacement(stocke, traceDuCalcul(off, periode, kid), c.res.kpiSummary,
+                                   c.nb, c.res.pieces_vues, moisDuDossier === periode);
+    if(d.remplacer) enregistrer(c);
+    else {
+      enAttente.push({ c:c, decision:d, nom:c.module.titre, mois:periode, avant:stocke,
+                       apres:c.res.kpiSummary });
+      journalLigne("warn", "["+c.module.titre+"] calculé mais PAS enregistré pour l'instant : un "+
+        "résultat existe déjà pour "+moisLisible(periode)+" — "+d.motif+".");
+    }
+  }
+  // Le Gérant tranche : une question par conseil, pas plus de deux (trancherRemplacements, revu le
+  // 01/10/2026 après contre-vérification). « OK » porte l'action conseillée ; quand l'application ne
+  // sait pas conseiller, « OK » garde ce qui est en mémoire et la question le DIT.
+  if(enAttente.length){
+    trancherRemplacements(enAttente, moisDuDossier);
+    const conserves = [];
+    enAttente.forEach(x=>{
+      if(x.garder){
+        conserves.push(x);
+        journalLigne("warn", "["+x.c.module.titre+"] résultat déjà enregistré GARDÉ pour "+
+          moisLisible(periode)+" : "+x.decision.motif+". Pour le recalculer, redéposez le dossier "+
+          "COMPLET du mois.");
+      } else {
+        enregistrer(x.c);
+        journalLigne("warn", "["+x.c.module.titre+"] résultat "+deMois(periode)+
+          " REMPLACÉ à votre demande ("+x.decision.motif+").");
+      }
+    });
+    afficherConserves(conserves, periode);
+  }
+
+  // On MEMORISE ce qui a ete reconnu, avant meme de savoir si un indicateur est sorti :
+  // les pieces deposees restent deposees, meme si le calcul a echoue pour une autre raison.
   if(off){
     off.pieces_vues_mensuel = off.pieces_vues_mensuel || {};
-    const deja = new Set(off.pieces_vues_mensuel[etat.periode] || []);
+    const deja = new Set(off.pieces_vues_mensuel[periode] || []);
     vuesDepot.forEach(r=>deja.add(r));
-    off.pieces_vues_mensuel[etat.periode] = [...deja].sort();
+    off.pieces_vues_mensuel[periode] = [...deja].sort();
+    // Les états « incomplet » sont remplacés PIÈCE PAR PIÈCE (01/10/2026), jamais en bloc. Défaut
+    // d'origine (constaté dans le pôle Trésorerie, même mécanique ici) : ils étaient remplacés en
+    // entier par ceux du dernier dépôt, et une pièce incomplète repassait « Reçue » sans avoir été
+    // redéposée. Seules les pièces RE-déposées sont réécrites.
     off.pieces_partielles_mensuel = off.pieces_partielles_mensuel || {};
-    off.pieces_partielles_mensuel[etat.periode] = partiellesDepot;
+    const prec = Object.assign({}, off.pieces_partielles_mensuel[periode] || {});
+    refsDeposees.forEach(r=>{ delete prec[r]; });
+    off.pieces_partielles_mensuel[periode] = Object.assign(prec, partiellesDepot);
   }
-  rendrePiecesDuMois();
-  afficherAlertePeriode(rejetsPeriode);
 
-  if(etat.resultats.length){
-    SV.marquerAnalyseFaite(MEM.etat.officine);
+  if(ecrits.length){
+    SV.marquerAnalyseFaite(off);
     const ok = await MEM.enregistrer();
     if(ok) journalLigne("ok","Analyse enregistrée dans ce navigateur : en rouvrant l'application, "+
       "vous retrouverez cette officine sans rien redéposer.");
@@ -10783,25 +12338,32 @@ async function traiterDepot(fileList){
       "à la fermeture de l'onglet. Télécharger la sauvegarde MAINTENANT (bouton en haut).");
   }
 
-  rendreCartes(etat.resultats);
-  if(etat.resultats.length){
-    rendreDetail(etat.resultats);
-    rendreLecture(etat.resultats);
-    document.getElementById("bloc-sortie").classList.remove("masque");
-  }
-  rendreTendances();
-  const n = etat.resultats.length;
+  // L'écran, la note et « Ce que valent ces chiffres » montrent TOUT le mois, pas ce seul dépôt.
+  afficherMemoire();
+  const n = ecrits.length;
   document.getElementById("sous-titre-ecran").textContent = n
     ? ("Analyse produite le "+new Date().toLocaleDateString("fr-FR")+" · "+n+" indicateur(s) "+
-       "calculé(s) sur "+modules.length+" installé(s)")
-    : "Aucun indicateur n'a pu être calculé — voir le journal.";
-  afficherResumeDepot(lot.length, lot.length, n);
+       "recalculé(s) par ce dépôt · "+etat.resultats.length+" en mémoire pour ce mois, sur "+
+       modules.length+" installé(s)")
+    : (etat.resultats.length
+        // 3e passe (01/10/2026) : « n'a rien recalculé » était faux quand le dépôt avait calculé
+        // et que le Gérant avait choisi de GARDER — c'est l'enregistrement qui n'a pas eu lieu.
+        ? (enAttente.length ? "Ce dépôt n'a rien remplacé (résultats déjà enregistrés gardés)"
+                            : "Ce dépôt n'a rien calculé")+" · "+etat.resultats.length+
+          " indicateur(s) en mémoire pour ce mois — voir le journal."
+        : "Aucun indicateur n'a pu être calculé — voir le journal.");
+  afficherResumeDepot(lot.length, lot.length, n, enAttente.length && !n
+    ? "Rien n'a été remplacé : les résultats déjà enregistrés sont gardés (voir le bandeau en haut)." : "");
 }
 
 // Alerte periode (11/09/2026, capture DG : depot d'aout sans effet visible pendant que
 // septembre etait affiche -- chaque module refusait en silence relatif, la seule trace
 // vivant tout en bas dans le Journal de traitement). Construite a partir des rejets de
 // periode remontes par les modules (periode_rejetee), jamais d'un texte regex-parsed.
+// TEXTE CORRIGÉ LE 01/10/2026 : il affirmait « c'est pour ça qu'aucun indicateur n'est sorti »
+// alors qu'un indicateur sans contrôle de mois pouvait avoir été enregistré (constaté dans le pôle
+// Trésorerie avec le recouvrement ; même mécanique ici).
+// Depuis, un lot qui porte un autre mois n'écrit plus rien : le bandeau le dit tel quel.
 function afficherAlertePeriode(rejets){
   const cont = document.getElementById("alerte-periode");
   if(!cont) return;
@@ -10816,21 +12378,48 @@ function afficherAlertePeriode(rejets){
   if(!meilleure || meilleure === etat.periode){ cont.innerHTML = ""; return; }
   cont.innerHTML =
     '<div class="kp-panel" style="margin-bottom:12px">'+
-    '<div class="kp-band kp-band--vigilance">Les fichiers déposés ne sont pas du mois affiché</div>'+
+    '<div class="kp-band kp-band--vigilance">Des fichiers déposés ne sont pas du mois affiché</div>'+
     '<div class="kp-panel__body">'+
-    '<p class="kp-body">Les fichiers déposés semblent être de <b>'+esc(moisLisibleCap(meilleure))+
-    '</b>, mais la période affichée est <b>'+esc(moisLisibleCap(etat.periode))+'</b> — c\'est '+
-    'pour ça qu\'aucun indicateur n\'est sorti (le détail exact est dans le journal, en bas).</p>'+
+    '<p class="kp-body">Des pièces de ce dépôt sont <b>'+esc(deMois(meilleure))+
+    '</b>, mais la période affichée est <b>'+esc(moisLisibleCap(etat.periode))+'</b>. '+
+    '<b>Rien n\'a été enregistré</b> : aucun résultat '+esc(deMois(etat.periode))+
+    ' n\'a été remplacé (le détail exact est dans le journal, en bas).</p>'+
+    '<p class="kp-body">Si tout le dossier est '+esc(deMois(meilleure))+', utilisez le bouton. '+
+    'Sinon, retirez de ce dossier les fichiers '+esc(deMois(meilleure))+', puis redéposez-le.</p>'+
     '<button class="kp-btn kp-btn--primary kp-btn--sm" id="btn-periode-basculer" type="button">'+
     'Passer à '+esc(moisLisibleCap(meilleure))+' et relancer</button></div></div>';
   document.getElementById("btn-periode-basculer").addEventListener("click", async ()=>{
-    const sel = document.getElementById("sel-periode");
-    sel.value = meilleure;
-    etat.periode = meilleure;
-    document.getElementById("titre-ecran").textContent = moisLisibleCap(meilleure)+TITRE_SUFFIXE;
+    basculerSur(meilleure);
     cont.innerHTML = "";
     if(dernierFichiers) await traiterDepot(dernierFichiers);
   });
+}
+
+// afficherConserves (01/10/2026) : ce qu'un dépôt n'a PAS remplacé, dit en haut de la page et pas
+// seulement au journal.
+// TEXTE CORRIGÉ LE 01/10/2026 (contre-vérification) : il affirmait de TOUT résultat gardé que « ce
+// dépôt ne portait pas toutes les pièces » et que le remplacer « aurait publié un chiffre amputé »
+// — faux pour un résultat sans trace, dont on ne sait rien, et faux pour un dossier complet.
+// Chaque résultat gardé porte désormais SON motif et les deux valeurs ; la phrase du chiffre amputé
+// ne vient que si un résultat a été gardé faute de pièces ou de fichiers.
+function afficherConserves(liste, periode){
+  const cont = document.getElementById("alerte-periode");
+  if(!cont || !liste.length) return;
+  const n = liste.length, pl = n>1 ? "s" : "";
+  const ampute = liste.some(x=>x.decision.cas === "pieces" || x.decision.cas === "fichiers");
+  const phrase = (m)=>{ m = String(m||""); return m.charAt(0).toUpperCase()+m.slice(1); };
+  cont.innerHTML =
+    '<div class="kp-panel" style="margin-bottom:12px">'+
+    '<div class="kp-band kp-band--vigilance">'+n+' résultat'+pl+' déjà enregistré'+pl+' gardé'+pl+
+    ' tel'+pl+' quel'+pl+', à votre demande</div>'+
+    '<div class="kp-panel__body">'+
+    liste.map(x=>'<p class="kp-body"><b>'+esc(x.nom)+'</b> ('+esc(moisLisible(periode))+') — enregistré : '+
+      esc(valeurLisible(x.avant, x.nom))+' ; ce dépôt aurait donné : '+esc(valeurLisible(x.apres, x.nom))+'. '+
+      esc(phrase(x.decision.motif))+'.</p>').join("")+
+    (ampute ? '<p class="kp-body">Un calcul fait sur moins de pièces ou de fichiers que le résultat '+
+      'enregistré pourrait publier un chiffre amputé.</p>' : '')+
+    '<p class="kp-body">Pour recalculer, redéposez le dossier COMPLET du mois — le dossier lui-même, le '+
+    'document arrivé en retard rangé dedans.</p></div></div>';
 }
 
 // Bandeau de resume, TOUJOURS rempli apres un depot (11/09/2026, capture DG : "Choisir un
@@ -10839,7 +12428,9 @@ function afficherAlertePeriode(rejets){
 // reconnu, le SEUL signe visible etait une petite phrase grise a cote du titre -- hors du
 // regard juste apres avoir choisi un dossier. Ce bandeau vit directement sous la zone de
 // depot et parle dans TOUS les cas, jamais un ecran qui semble ne pas avoir bouge.
-function afficherResumeDepot(recus, exploitables, calcules){
+// `motif` (01/10/2026) : quand rien n'est enregistré pour une raison CONNUE — dépôt d'un autre
+// mois, résultats gardés —, c'est elle qu'on dit, et non « aucun fichier reconnu », qui serait faux.
+function afficherResumeDepot(recus, exploitables, calcules, motif){
   const cont = document.getElementById("resume-depot");
   if(!cont) return;
   if(recus === 0){
@@ -10854,6 +12445,11 @@ function afficherResumeDepot(recus, exploitables, calcules){
       '<div class="kp-band kp-band--urgent">'+recus+' fichier(s) reçu(s), aucun lisible</div>'+
       '<div class="kp-panel__body"><p class="kp-body">Voir le <b>Journal de traitement</b> '+
       'ci-dessous : chaque fichier y est nommé avec la raison exacte du refus.</p></div></div>';
+  } else if(calcules === 0 && motif){
+    cont.innerHTML =
+      '<div class="kp-panel" style="margin:12px 0">'+
+      '<div class="kp-band kp-band--vigilance">'+exploitables+' fichier(s) déposé(s), rien d\'enregistré</div>'+
+      '<div class="kp-panel__body"><p class="kp-body">'+esc(motif)+'</p></div></div>';
   } else if(calcules === 0){
     cont.innerHTML =
       '<div class="kp-panel" style="margin:12px 0">'+
@@ -11059,9 +12655,15 @@ async function fichiersDepuisDataTransfer(dataTransfer){
       })();
     });
   }
+  // LE CHEMIN VOYAGE AVEC LE FICHIER (01/10/2026) — même correctif que dans l'application Achat :
+  // un fichier tiré d'un dossier glissé n'a pas de webkitRelativePath, c'est ici seulement qu'on
+  // connaît son chemin (fullPath). Le garde-fou de période le lit via cheminDuFichier().
   function fichierDepuisEntree(fileEntry){
     return new Promise(resolve=>{
-      fileEntry.file(resolve, err=>{
+      fileEntry.file(f=>{
+        try{ if(f && !f.webkitRelativePath) f.kpChemin = String(fileEntry.fullPath||"").replace(/^\//, ""); }catch(e){}
+        resolve(f);
+      }, err=>{
         erreurs.push("Fichier « "+fileEntry.fullPath+" » : illisible, ignoré.");
         resolve(null);
       });
@@ -11164,16 +12766,10 @@ if(selApp){
 // Appelé par la couche mémoire une fois l'officine ouverte.
 function demarrer(){
   peuplerPeriodes();
-  document.getElementById("titre-ecran").textContent = moisLisibleCap(etat.periode)+" — Parapharmacie";
-  const periodes = Object.keys((MEM.etat.officine.historique_mensuel)||{}).sort();
-  if(periodes.length){
-    const dernier = periodes[periodes.length-1];
-    const sel = document.getElementById("sel-periode");
-    if([...sel.options].some(o=>o.value === dernier)){
-      sel.value = dernier; etat.periode = dernier;
-      document.getElementById("titre-ecran").textContent = moisLisibleCap(etat.periode)+" — Parapharmacie";
-    }
-  }
+  // LE MOIS À CLÔTURER (01/10/2026), et non plus le dernier mois analysé — même défaut et même
+  // correctif que dans le pôle Trésorerie. Voir moisAOuvrir() : M-1, sauf si le mois courant porte
+  // déjà des analyses.
+  basculerSur(moisAOuvrir((MEM.etat.officine && MEM.etat.officine.historique_mensuel) || {}, new Date()));
   afficherMemoire();
 }
 
